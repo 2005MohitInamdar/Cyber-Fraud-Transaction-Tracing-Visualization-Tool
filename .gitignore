@@ -144,3 +144,7 @@ backend/services/fileupload/__pycache__
 backend/services/pdf_extraction/demo_pdf.pdf
 backend/supaInit/__pycache__
 
+demo_pdf.docx
+demo_pdf.pdf
+newNotes.txt
+notes.txt

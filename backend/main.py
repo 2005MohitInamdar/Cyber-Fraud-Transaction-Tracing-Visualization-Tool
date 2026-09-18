@@ -5,6 +5,10 @@ from services.auth import login, signup, get_current_user
 from services.fileupload.upload import FileUploadMetadata, initiate_upload, receive_chunk
 from services.caseLeadData.lead import CaseLeadOfficer, receive_lead_data
 
+# ─── Cookie config (single source of truth) ──────────────────────────────────
+_COOKIE_NAME    = "access_token"
+_COOKIE_MAX_AGE = 60 * 60 * 24   # 1 day
+
 
 class InitiateUploadRequest(BaseModel):
     leadOfficer: CaseLeadOfficer
@@ -61,22 +65,64 @@ def loginUser(credentials: UserCredentials, response: Response):
             )
         
         response.set_cookie(
-            key="access_token",
+            key=_COOKIE_NAME,
             value=session.access_token,
             httponly=True,
-            secure=False,  # Set to True in production (requires HTTPS)
+            secure=False,   # Set to True in production (requires HTTPS)
             samesite="lax",
-            max_age=60 * 60 * 24  # 1 day expiration
-        )      
+            max_age=_COOKIE_MAX_AGE,
+        )
 
-             
         return {"message": "Logged in successfully!"}
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password."
+            detail="Invalid email or password.",
         )
+
+
+# ─── Auth: Session Check & Logout ────────────────────────────────────────────
+
+@app.get("/auth/me", status_code=status.HTTP_200_OK)
+def get_me(request: Request):
+    """
+    Lightweight session check used by the Angular auth guard.
+
+    Reads the HttpOnly `access_token` cookie, validates it with Supabase,
+    and returns the authenticated user's UUID.  Returns 401 if the cookie
+    is absent or the token is invalid / expired.
+
+    The Angular guard calls this on every protected route activation; it
+    MUST be fast (Supabase token validation is a single remote call).
+    """
+    access_token = request.cookies.get(_COOKIE_NAME)
+    try:
+        user_id = get_current_user(access_token)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    return {"userId": user_id}
+
+
+@app.post("/auth/logout", status_code=status.HTTP_200_OK)
+def logout(response: Response):
+    """
+    Clears the HttpOnly `access_token` cookie.
+
+    The Angular frontend calls this on sign-out.  We do not need to
+    invalidate the Supabase session server-side because the token will
+    simply expire naturally; clearing the cookie is sufficient to prevent
+    further authenticated requests from this browser.
+    """
+    response.delete_cookie(
+        key=_COOKIE_NAME,
+        httponly=True,
+        samesite="lax",
+    )
+    return {"message": "Logged out successfully."}
 
 
 # ─── Upload Routes ───────────────────────────────────────────────────────────
@@ -173,6 +219,7 @@ async def upload_chunk_route(
     # ── 3. Verify & print chunk metadata ─────────────────────────────────────
     try:
         result = receive_chunk(
+            request,
             upload_id=uploadId,
             chunk_number=chunkNumber,
             chunk_bytes=chunk_bytes,

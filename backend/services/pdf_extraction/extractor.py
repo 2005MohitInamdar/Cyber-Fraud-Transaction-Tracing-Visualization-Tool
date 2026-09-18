@@ -1,17 +1,34 @@
 """
 PDF Table Extractor
 ====================
-Extracts fixed-schema tables from the complaint-report PDF using pdfplumber.
+Extracts fixed-schema tables from the complaint-report PDF using pdfplumber
+and writes one JSON file per table. Fully standalone — no other modules
+required.
 
 Tables extracted (always present, fixed columns):
-  1. complaint_transactions  - main complainant transaction list   (Page 2, Table 1)
-  2. pending_transactions    - transactions pending at banks       (Page 2, Table 2)
-  3. amount_summary          - summary of amounts put on hold      (Page 3, Table 1)
-  4. lien_transactions       - detailed lien/action table          (Pages 3-7, Table 2)
-  5. hold_accounts           - per-account hold details            (Page 8)
-  6. failed_transactions     - failed / zero-amount transactions   (Page 9, Table 1)
-  7. no_action_references    - reference nos with no action taken  (Page 9, Table 2)
-  8. complaint_meta          - complaint acceptance meta-data      (Page 9, Table 3)
+  1. complaint_transactions  - main complainant transaction list
+  2. pending_transactions    - transactions pending at banks
+  3. amount_summary          - summary of amounts put on hold
+  4. lien_transactions       - detailed lien/action table
+  5. hold_accounts           - per-account hold details
+  6. failed_transactions     - failed / zero-amount transactions
+  7. no_action_references    - reference nos with no action taken
+  8. complaint_meta          - complaint acceptance meta-data
+
+Why this doesn't key off page numbers
+----------------------------------------
+Real complaint reports vary in page count and table layout depending on
+how much data each section has (more lien rows pushes everything after it
+onto fewer/more pages, tables split mid-row across a page boundary, etc).
+So instead of assuming "table X always lives on page Y", every table
+pdfplumber finds on every page is classified by its *header content* (see
+`_classify_table`), not by its position.
+
+A table whose first row doesn't match any known header is treated as a
+continuation of whichever table was most recently classified — this is
+how pdfplumber represents a table that got cut off mid-page-break: the
+continuation table has no header row of its own, just more data rows
+with the same column count as the table it continues.
 
 Usage (standalone):
     python extractor.py <path_to_pdf> [output_directory]
@@ -21,7 +38,6 @@ Usage (standalone):
 """
 
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -29,9 +45,7 @@ from pathlib import Path
 import pdfplumber
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# ── Cell / header cleanup ──────────────────────────────────────────────────────
 
 def _clean(value) -> str:
     """Collapse newlines / extra whitespace inside a cell value."""
@@ -81,23 +95,110 @@ def _save_json(data: dict, output_dir: Path, filename: str) -> Path:
     return out_path
 
 
-def _extract_simple(raw_table: list, table_name: str) -> dict:
-    """Generic extractor: first row = header, remaining rows = data."""
-    if not raw_table:
-        return {"table": table_name, "columns": [], "rows": []}
-    header = _clean_header(raw_table[0])
-    rows = _rows_to_dicts(header, raw_table[1:])
-    return {"table": table_name, "columns": header, "rows": rows}
+# ── Table classification ───────────────────────────────────────────────────────
+#
+# Every table pdfplumber returns is classified by looking at its *header
+# row's content* — not its page number or table index. A row is only
+# treated as a header if it matches one of these signatures; anything else
+# is assumed to be a continuation of the previously-classified table (see
+# the main loop in extract_tables()).
+#
+# Order matters: rules are checked top-to-bottom, first match wins. More
+# specific / distinctive signatures are checked before looser ones (e.g.
+# hold_accounts and failed_transactions both have 7 columns and share
+# several header words, so hold_accounts' "put on hold" marker — which is
+# unique to it — is checked before the looser failed_transactions rule).
+
+_META_KEYS = {
+    "complaint accepted by",
+    "complaint accepted date",
+    "current status",
+    "under process",
+}
+
+_ID_COLUMNS = {
+    "complaint_transactions": "S No.",
+    "pending_transactions":   "S No.",
+    "amount_summary":         "S No.",
+    "lien_transactions":      "S No.",
+    "hold_accounts":          "S No.",
+    "failed_transactions":    "S No.",
+    "no_action_references":   "S No.",
+}
+
+_TABLE_FILENAMES = {
+    "complaint_transactions": "complaint_transactions.json",
+    "pending_transactions":   "pending_transactions.json",
+    "amount_summary":         "amount_summary.json",
+    "lien_transactions":      "lien_transactions.json",
+    "hold_accounts":          "hold_accounts.json",
+    "failed_transactions":    "failed_transactions.json",
+    "no_action_references":   "no_action_references.json",
+    "complaint_meta":         "complaint_meta.json",
+}
 
 
-# ---------------------------------------------------------------------------
-# Main extractor
-# ---------------------------------------------------------------------------
+def _classify_table(cleaned_header: list) -> str | None:
+    """
+    Return the table_name this header row belongs to, or None if it
+    doesn't look like a header at all (i.e. it's actual data — a
+    continuation row from a table whose header appeared on an earlier
+    page/table).
+    """
+    cols = len(cleaned_header)
+    norm = " | ".join(c.lower() for c in cleaned_header)
+    norm = re.sub(r"\s+", " ", norm)
+
+    # complaint_meta: a flat 2-column key/value table. Every "row" is a
+    # key/value pair, including what pdfplumber treats as the header row.
+    if cols == 2:
+        first_cell = re.sub(r"\s+", " ", cleaned_header[0].lower())
+        if any(k in first_cell for k in _META_KEYS):
+            return "complaint_meta"
+
+    if "ifsc" in norm:
+        return "lien_transactions"
+
+    if "put on hold" in norm:
+        return "hold_accounts"
+
+    if (
+        "amount" in norm
+        and "account no" in norm
+        and "put on hold" not in norm
+        and "ifsc" not in norm
+        and "wallet" not in norm
+        and "card details" not in norm
+        and "pending" not in norm
+        and 6 <= cols <= 8
+    ):
+        return "failed_transactions"
+
+    if (
+        cols <= 4
+        and "reference no" in norm
+        and "action taken" in norm
+        and "account no" not in norm
+    ):
+        return "no_action_references"
+
+    if "pending" in norm:
+        return "pending_transactions"
+
+    if "card details" in norm or ("wallet" in norm and "transacti" in norm):
+        return "complaint_transactions"
+
+    if "amount" in norm and cols <= 3:
+        return "amount_summary"
+
+    return None
+
 
 def extract_tables(pdf_path, output_dir=None) -> dict:
     """
-    Open *pdf_path*, extract all known tables, write one JSON file per table
-    into *output_dir*, and return a mapping of {table_name: json_path}.
+    Open *pdf_path*, extract all known tables (regardless of which pages
+    they fall on), write one JSON file per table into *output_dir*, and
+    return a mapping of {table_name: json_path}.
 
     Parameters
     ----------
@@ -119,102 +220,90 @@ def extract_tables(pdf_path, output_dir=None) -> dict:
 
     written = {}
 
+    # Accumulated state, built up across every table on every page.
+    table_headers: dict[str, list] = {}    # table_name -> header cell list (first time seen)
+    table_raw_rows: dict[str, list] = {}   # table_name -> list of raw data rows (no header)
+    meta_rows: list = []                   # complaint_meta: list of raw [key, value, ...] rows
+    active_type: str | None = None         # most recently classified table — continuation target
+
     with pdfplumber.open(pdf_path) as pdf:
-        pages = pdf.pages  # list, 0-indexed
+        pages = pdf.pages
+        print(f"  [extractor] PDF opened — {len(pages)} page(s) found: {pdf_path}")
 
-        # ------------------------------------------------------------------ #
-        # Page 2  (index 1) — complaint_transactions + pending_transactions   #
-        # ------------------------------------------------------------------ #
-        p2_tables = pages[1].extract_tables()
+        if not pages:
+            print("  [extractor] WARNING: PDF has no pages — skipping extraction")
+            return written
 
-        if len(p2_tables) >= 1:
-            payload = _extract_simple(p2_tables[0], "complaint_transactions")
-            written["complaint_transactions"] = _save_json(
-                payload, output_dir, "complaint_transactions.json"
-            )
-
-        if len(p2_tables) >= 2:
-            payload = _extract_simple(p2_tables[1], "pending_transactions")
-            written["pending_transactions"] = _save_json(
-                payload, output_dir, "pending_transactions.json"
-            )
-
-        # ------------------------------------------------------------------ #
-        # Page 3  (index 2) — amount_summary + start of lien_transactions     #
-        # ------------------------------------------------------------------ #
-        p3_tables = pages[2].extract_tables()
-
-        if len(p3_tables) >= 1:
-            payload = _extract_simple(p3_tables[0], "amount_summary")
-            written["amount_summary"] = _save_json(
-                payload, output_dir, "amount_summary.json"
-            )
-
-        # lien_transactions spans pages 3-7; header is on page 3
-        lien_header = []
-        lien_rows = []
-
-        if len(p3_tables) >= 2:
-            raw = p3_tables[1]
-            lien_header = _clean_header(raw[0])
-            lien_rows.extend(_rows_to_dicts(lien_header, raw[1:]))
-
-        # Continuation pages 4-7 (indices 3-6)
-        for page_idx in range(3, 7):
-            cont_tables = pages[page_idx].extract_tables()
-            if not cont_tables:
+        for page_idx, page in enumerate(pages):
+            page_tables = page.extract_tables()
+            if not page_tables:
                 continue
-            raw = cont_tables[0]
-            # Skip row if it's a repeated header
-            first_row = _clean_header(raw[0])
-            data_rows = raw[1:] if first_row == lien_header else raw
-            lien_rows.extend(_rows_to_dicts(lien_header, data_rows))
 
-        if lien_header:
+            for raw in page_tables:
+                if not raw or not raw[0]:
+                    continue
+
+                header_row = raw[0]
+                cleaned_header = _clean_header(header_row)
+                table_type = _classify_table(cleaned_header)
+
+                # ── complaint_meta: flat key/value pairs, every row counts ──
+                if table_type == "complaint_meta":
+                    for row in raw:
+                        if len(row) >= 2:
+                            meta_rows.append(row)
+                    active_type = None
+                    continue
+
+                # ── recognised header: start or continue this table type ───
+                if table_type is not None:
+                    if table_type not in table_headers:
+                        table_headers[table_type] = cleaned_header
+                        table_raw_rows[table_type] = []
+                    # `raw[0]` was a genuine header row here, so only the
+                    # rows after it are data.
+                    table_raw_rows[table_type].extend(raw[1:])
+                    active_type = table_type
+                    continue
+
+                # ── unrecognised header: likely a continuation table ───────
+                # pdfplumber has no way to know a table is "the same table,
+                # continued" — it just returns a fresh table per page with
+                # no header row. We detect this by column count matching
+                # the currently active table.
+                if active_type is not None:
+                    expected_cols = len(table_headers[active_type])
+                    if len(header_row) == expected_cols:
+                        # every row here is data — nothing to skip
+                        table_raw_rows[active_type].extend(raw)
+                        continue
+
+                print(
+                    f"  [extractor] WARNING: unrecognised table on page "
+                    f"{page_idx + 1} ({len(header_row)} cols) — skipped: "
+                    f"{cleaned_header}"
+                )
+
+        # ── Convert rows and save each accumulated table ───────────────────────
+        for table_name, header in table_headers.items():
+            rows = _rows_to_dicts(header, table_raw_rows[table_name])
             payload = {
-                "table": "lien_transactions",
-                "columns": lien_header,
-                "rows": lien_rows,
+                "table":   table_name,
+                "columns": header,
+                "rows":    rows,
             }
-            written["lien_transactions"] = _save_json(
-                payload, output_dir, "lien_transactions.json"
+            written[table_name] = _save_json(
+                payload, output_dir, _TABLE_FILENAMES[table_name]
             )
 
-        # ------------------------------------------------------------------ #
-        # Page 8  (index 7) — hold_accounts                                   #
-        # ------------------------------------------------------------------ #
-        p8_tables = pages[7].extract_tables()
-        if p8_tables:
-            payload = _extract_simple(p8_tables[0], "hold_accounts")
-            written["hold_accounts"] = _save_json(
-                payload, output_dir, "hold_accounts.json"
-            )
-
-        # ------------------------------------------------------------------ #
-        # Page 9  (index 8) — failed_transactions, no_action_references,      #
-        #                      complaint_meta                                  #
-        # ------------------------------------------------------------------ #
-        p9_tables = pages[8].extract_tables()
-
-        if len(p9_tables) >= 1:
-            payload = _extract_simple(p9_tables[0], "failed_transactions")
-            written["failed_transactions"] = _save_json(
-                payload, output_dir, "failed_transactions.json"
-            )
-
-        if len(p9_tables) >= 2:
-            payload = _extract_simple(p9_tables[1], "no_action_references")
-            written["no_action_references"] = _save_json(
-                payload, output_dir, "no_action_references.json"
-            )
-
-        if len(p9_tables) >= 3:
-            raw = p9_tables[2]
-            # Key-value layout — convert to a flat dict
+        # ── complaint_meta: flat key/value dict ────────────────────────────────
+        if meta_rows:
             meta = {}
-            for row in raw:
-                if len(row) >= 2:
-                    meta[_clean(row[0])] = _clean(row[1])
+            for row in meta_rows:
+                key = _clean(row[0])
+                val = _clean(row[1]) if len(row) >= 2 else ""
+                if key:
+                    meta[key] = val
             payload = {"table": "complaint_meta", "data": meta}
             written["complaint_meta"] = _save_json(
                 payload, output_dir, "complaint_meta.json"
@@ -222,10 +311,6 @@ def extract_tables(pdf_path, output_dir=None) -> dict:
 
     return written
 
-
-# ---------------------------------------------------------------------------
-# CLI entry-point
-# ---------------------------------------------------------------------------
 
 def main():
     if len(sys.argv) < 2:

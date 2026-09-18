@@ -1,1 +1,763 @@
-Upload complete
+account_summary.json
+
+
+{
+  "table": "amount_summary",
+  "columns": [
+    "S No.",
+    "",
+    "Amount"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "": "Transaction put on hold",
+      "Amount": "Rs. 38,983.54"
+    },
+    {
+      "S No.": "2",
+      "": "Other",
+      "Amount": "Rs. 0.10"
+    },
+    {
+      "S No.": "3",
+      "": "Others [ <=500]",
+      "Amount": "Rs. 3,248.76"
+    }
+  ]
+}
+
+
+complaint_meta.json
+
+{
+  "table": "complaint_meta",
+  "data": {
+    "Complaint Accepted By": "Login Id: nccrp.aurangabadr Name: nccrp.aurangabadr(DISTRICT)",
+    "Complaint Accepted Date": "12/08/2026 11:06:35 AM",
+    "Current Status": "Under Process",
+    "Under Process": "12/08/2026 11:06:35 AM"
+  }
+}
+
+complaint_transaction.json
+
+{
+  "table": "complaint_transactions",
+  "columns": [
+    "S No",
+    "Account No./ Wallet ID",
+    "Transacti on ID",
+    "Card Details",
+    "Transacti on Amount",
+    "Reference No.",
+    "Transacti on Date & Time",
+    "Complaint Date",
+    "Bank/FIs"
+  ],
+  "rows": [
+    {
+      "S No": "1",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "928956345760",
+      "Card Details": "",
+      "Transacti on Amount": "5,000.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "29/06/2026 22:00:PM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    },
+    {
+      "S No": "2",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "947389349911",
+      "Card Details": "",
+      "Transacti on Amount": "99.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "08/08/2026 00:00:AM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    },
+    {
+      "S No": "3",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "509857442064",
+      "Card Details": "",
+      "Transacti on Amount": "500.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "11/08/2026 00:00:AM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    },
+    {
+      "S No": "4",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "750512309163",
+      "Card Details": "",
+      "Transacti on Amount": "39,000.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "08/08/2026 00:00:AM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    },
+    {
+      "S No": "5",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "047982392609",
+      "Card Details": "",
+      "Transacti on Amount": "5,000.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "29/06/2026 10:20:AM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    },
+    {
+      "S No": "6",
+      "Account No./ Wallet ID": "Others - :302098163",
+      "Transacti on ID": "225013305677",
+      "Card Details": "",
+      "Transacti on Amount": "500.00",
+      "Reference No.": "",
+      "Transacti on Date & Time": "11/08/2026 00:00:AM",
+      "Complaint Date": "11/08/202 6 13:15:PM",
+      "Bank/FIs": "Indian Bank"
+    }
+  ]
+}
+
+failed_transaction.json
+{
+  "table": "failed_transactions",
+  "columns": [
+    "S No.",
+    "Account No.",
+    "Date",
+    "Transaction Amount",
+    "Reference No / Remarks",
+    "Action Taken By",
+    "Date of Action"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "Account No.": "Others -:302098163",
+      "Date": "11/08/2026",
+      "Transaction Amount": "0.10",
+      "Reference No / Remarks": "This is a failed transaction",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "11/08/2026 23:57:29"
+    }
+  ]
+}
+
+hold_accounts.json
+
+{
+  "table": "hold_accounts",
+  "columns": [
+    "S No.",
+    "Account No.",
+    "Put on hold Date",
+    "Put on hold Amount",
+    "Reference No / Remarks",
+    "Action Taken By",
+    "Date of Action"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "Account No.": "876005973",
+      "Put on hold Date": "11/08/2026",
+      "Put on hold Amount": "500.00",
+      "Reference No / Remarks": "",
+      "Action Taken By": "India Post Payments Bank",
+      "Date of Action": "11/08/2026 13:30:19"
+    },
+    {
+      "S No.": "2",
+      "Account No.": "3768795609",
+      "Put on hold Date": "11/08/2026",
+      "Put on hold Amount": "8,980.65",
+      "Reference No / Remarks": "Hold(s) Exist due to statutory dues, etc.",
+      "Action Taken By": "State Bank of India",
+      "Date of Action": "12/08/2026 00:05:01"
+    },
+    {
+      "S No.": "3",
+      "Account No.": "38501960",
+      "Put on hold Date": "11/08/2026",
+      "Put on hold Amount": "119.20",
+      "Reference No / Remarks": "Lien Marked :119.2, Amount on Hold : 119.2",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/2026 00:08:22"
+    },
+    {
+      "S No.": "4",
+      "Account No.": "5050984506",
+      "Put on hold Date": "11/08/2026",
+      "Put on hold Amount": "2,818.31",
+      "Reference No / Remarks": "Put on Hold",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/2026 00:15:01"
+    },
+    {
+      "S No.": "5",
+      "Account No.": "9501278861",
+      "Put on hold Date": "12/08/2026",
+      "Put on hold Amount": "18,049.84",
+      "Reference No / Remarks": "Lien marked for the Disputed amount",
+      "Action Taken By": "Axis Bank",
+      "Date of Action": "12/08/2026 00:20:24"
+    },
+    {
+      "S No.": "6",
+      "Account No.": "9803904559",
+      "Put on hold Date": "29/06/2026",
+      "Put on hold Amount": "2.98",
+      "Reference No / Remarks": "Lien Marked:2.98, Amount on Hold : 2.98",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/2026 10:42:31"
+    },
+    {
+      "S No.": "7",
+      "Account No.": "87478916",
+      "Put on hold Date": "07/08/2026",
+      "Put on hold Amount": "2,356.80",
+      "Reference No / Remarks": "Lien Marked:2356.8, Amount on Hold : 2356.8",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/2026 10:46:37"
+    },
+    {
+      "S No.": "8",
+      "Account No.": "87478916",
+      "Put on hold Date": "25/07/2026",
+      "Put on hold Amount": "2,353.82",
+      "Reference No / Remarks": "Lien Marked:2353.82, Amount on Hold : 2353.82",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/2026 10:46:37"
+    },
+    {
+      "S No.": "9",
+      "Account No.": "9750427169",
+      "Put on hold Date": "12/08/2026",
+      "Put on hold Amount": "637.32",
+      "Reference No / Remarks": "NCRP: Lien marked on account",
+      "Action Taken By": "Punjab National Bank",
+      "Date of Action": "12/08/2026 11:35:01"
+    },
+    {
+      "S No.": "10",
+      "Account No.": "83671091014",
+      "Put on hold Date": "12/08/2026",
+      "Put on hold Amount": "21.42",
+      "Reference No / Remarks": "LIEN MARKED WITH LIEN ID BI3415073",
+      "Action Taken By": "Bank of India",
+      "Date of Action": "12/08/2026 12:05:01"
+    },
+    {
+      "S No.": "11",
+      "Account No.": "94750013245 2",
+      "Put on hold Date": "12/08/2026",
+      "Put on hold Amount": "500.00",
+      "Reference No / Remarks": "LIEN MARKED WITH LIEN ID BI342037",
+      "Action Taken By": "Bank of India",
+      "Date of Action": "12/08/2026 14:35:01"
+    },
+    {
+      "S No.": "12",
+      "Account No.": "5830017208",
+      "Put on hold Date": "13/08/2026",
+      "Put on hold Amount": "2,643.20",
+      "Reference No / Remarks": "946922004 Lien has been placed due to a Disputed transaction",
+      "Action Taken By": "AIRPAY",
+      "Date of Action": "13/08/2026 20:28:34"
+    }
+  ]
+}
+
+lien_transactions.json
+{
+  "table": "lien_transactions",
+  "columns": [
+    "S No.",
+    "Bank /FIs",
+    "Account No./IFSC Code",
+    "Transac tion ID / UTR Number",
+    "Transac tion Date & Time",
+    "Transacti on Amount",
+    "Dispute d Amount",
+    "Referen ce No / Remark s",
+    "Action Taken By",
+    "Date of Action"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "Bank /FIs": "India Post Payments Bank",
+      "Account No./IFSC Code": "876005973 IPOS00001 Layer :1",
+      "Transac tion ID / UTR Number": "985045863 457",
+      "Transac tion Date & Time": "11/08/202 6 10:11:AM",
+      "Transacti on Amount": "500.00",
+      "Dispute d Amount": "500.00",
+      "Referen ce No / Remark s": "Success",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "11/08/202 6 13:25:01"
+    },
+    {
+      "S No.": "2",
+      "Bank /FIs": "State Bank of India",
+      "Account No./IFSC Code": "03768795609 SBIN03796 Layer :1",
+      "Transac tion ID / UTR Number": "985325102 416",
+      "Transac tion Date & Time": "11/08/202 6 10:08:AM",
+      "Transacti on Amount": "39,000.00",
+      "Dispute d Amount": "39,000.00",
+      "Referen ce No / Remark s": "upi transfer",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "12/08/202 6 00:00:07"
+    },
+    {
+      "S No.": "3",
+      "Bank /FIs": "Punjab National Bank",
+      "Account No./IFSC Code": "86401700146 006 PUNB6600 Layer :1",
+      "Transac tion ID / UTR Number": "059637389 409",
+      "Transac tion Date & Time": "06/08/202 6 15:55:PM",
+      "Transacti on Amount": "99.94",
+      "Dispute d Amount": "99.00",
+      "Referen ce No / Remark s": "upi transfer",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "12/08/202 6 00:02:03"
+    },
+    {
+      "S No.": "4",
+      "Bank /FIs": "Kotak Mahindra Bank",
+      "Account No./IFSC Code": "38501960 KKBK00946 Layer :2",
+      "Transac tion ID / UTR Number": "345373376 385",
+      "Transac tion Date & Time": "11/08/202 6 14:14:PM",
+      "Transacti on Amount": "31,000.00",
+      "Dispute d Amount": "29,919.35",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "State Bank of India",
+      "Date of Action": "12/08/202 6 00:05:01"
+    },
+    {
+      "S No.": "5",
+      "Bank /FIs": "HDFC Bank",
+      "Account No./IFSC Code": "5050984506 HDFC02843 Layer :3",
+      "Transac tion ID / UTR Number": "980281385 065",
+      "Transac tion Date & Time": "11/08/202 6 15:01:PM",
+      "Transacti on Amount": "31,000.00",
+      "Dispute d Amount": "29,800.15",
+      "Referen ce No / Remark s": "UPI/ABH I SHEK DATTA/ H DFC/259 6138501 79/Paym ent from",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/202 6 00:08:22"
+    },
+    {
+      "S No.": "6",
+      "Bank /FIs": "Others (UPI- ANAS MILK SUPPLIER - 766632036 4-2@axl- HDFC0CS HS- 787222182 40- Payment from Phone)",
+      "Account No./IFSC Code": "02100000270 HDFC0CSHS Layer :4",
+      "Transac tion ID / UTR Number": "798722218 240",
+      "Transac tion Date & Time": "11/08/202 6 12:00:PM",
+      "Transacti on Amount": "6,000.00",
+      "Dispute d Amount": "6,000.00",
+      "Referen ce No / Remark s": "UPI- ANAS MILK SUPPLIE R- 7666320 364- 2@axl- HDFC0C SHSBL- 7872221 8240- Payment from Phone",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": ""
+    },
+    {
+      "S No.": "7",
+      "Bank /FIs": "Others (UPI-INDIA SHELTER FINANC- indiashelt er.payu@ indus- INDB0ME RA- 114792987 -Upi Transactio n)",
+      "Account No./IFSC Code": "9356487950 INDB0MERA Layer :4",
+      "Transac tion ID / UTR Number": "114022279 2987",
+      "Transac tion Date & Time": "11/08/202 6 12:00:PM",
+      "Transacti on Amount": "1,180.00",
+      "Dispute d Amount": "1,180.00",
+      "Referen ce No / Remark s": "UPI- INDIA SHELTE R FINANC- indiashe lter.payu @indus- INDB0M ERCHA- 1147929 87- Upi Transact ion",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/202 6 00:15:01"
+    },
+    {
+      "S No.": "8",
+      "Bank /FIs": "Others (UPI-INDIA SHELTER FINANC- indiashelt er.payu@i ndus- INDB0ME RA- 9801426- Upi Transactio n)",
+      "Account No./IFSC Code": "9356487950 INDB0MERA Layer :4",
+      "Transac tion ID / UTR Number": "980142109 236",
+      "Transac tion Date & Time": "11/08/202 6 12:00:PM",
+      "Transacti on Amount": "826.00",
+      "Dispute d Amount": "826.00",
+      "Referen ce No / Remark s": "UPI- INDIASH ELTER FINANC- indiashe lter.payu @indus- INDB0M ERCHA- 1001479 29382- Upi Transact ion",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/202 6 00:15:01"
+    },
+    {
+      "S No.": "9",
+      "Bank /FIs": "Others (UPI-INDIA SHELTER FINANC- indiashelt er.payu@i ndus- INDB0ME RA- 198147987 -Upi Transactio n)",
+      "Account No./IFSC Code": "9356487950 INDB0MERA Layer :4",
+      "Transac tion ID / UTR Number": "192814793 387",
+      "Transac tion Date & Time": "11/08/202 6 12:00:PM",
+      "Transacti on Amount": "826.00",
+      "Dispute d Amount": "826.00",
+      "Referen ce No / Remark s": "UPI- INDIA SHELTE R FINANC- indiashe lter.payu @indus- INDB0M ERCHA- 1981479 87-Upi Tranatio",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/202 6 00:15:01"
+    },
+    {
+      "S No.": "",
+      "Bank /FIs": "",
+      "Account No./IFSC Code": "",
+      "Transac tion ID / UTR Number": "",
+      "Transac tion Date & Time": "",
+      "Transacti on Amount": "",
+      "Dispute d Amount": "",
+      "Referen ce No / Remark s": "n",
+      "Action Taken By": "",
+      "Date of Action": ""
+    },
+    {
+      "S No.": "10",
+      "Bank /FIs": "Axis Bank",
+      "Account No./IFSC Code": "9501278861 UTIB00731 Layer :4",
+      "Transac tion ID / UTR Number": "989101110 153",
+      "Transac tion Date & Time": "11/08/202 6 12:00:PM",
+      "Transacti on Amount": "50,000.00",
+      "Dispute d Amount": "18,049.84",
+      "Referen ce No / Remark s": "UPI- SUNITA GAJANA NHARAL - 7020620 752- 2@axl- UTIB000 1731- 3049106 31573- Payment from Phone",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/202 6 00:15:01"
+    },
+    {
+      "S No.": "11",
+      "Bank /FIs": "Jio Payments Bank Ltd",
+      "Account No./IFSC Code": "03321504571 9 JIOP0001 Layer :1",
+      "Transac tion ID / UTR Number": "090189563 585",
+      "Transac tion Date & Time": "29/06/202 6 00:00:AM",
+      "Transacti on Amount": "5,000.00",
+      "Dispute d Amount": "5,000.00",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "12/08/202 6 10:32:59"
+    },
+    {
+      "S No.": "12",
+      "Bank /FIs": "Bank of Baroda",
+      "Account No./IFSC Code": "67080000100 BARB0RAPTI Layer :1",
+      "Transac tion ID / UTR Number": "076392526 089",
+      "Transac tion Date & Time": "29/06/202 6 00:00:AM",
+      "Transacti on Amount": "5,000.00",
+      "Dispute d Amount": "5,000.00",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Indian Bank",
+      "Date of Action": "12/08/202 6 10:33:33"
+    },
+    {
+      "S No.": "13",
+      "Bank /FIs": "Kotak Mahindra Bank",
+      "Account No./IFSC Code": "9803904559 KKBK02575 Layer :2",
+      "Transac tion ID / UTR Number": "097229337 221",
+      "Transac tion Date & Time": "29/06/202 6 20:50:PM",
+      "Transacti on Amount": "7,000.00",
+      "Dispute d Amount": "5,000.00",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Bank of Baroda",
+      "Date of Action": "12/08/202 6 10:39:22"
+    },
+    {
+      "S No.": "14",
+      "Bank /FIs": "Kotak Mahindra Bank",
+      "Account No./IFSC Code": "9803904559 KKBK02575 Layer :2",
+      "Transac tion ID / UTR Number": "198819202 821",
+      "Transac tion Date & Time": "29/06/202 6 20:50:PM",
+      "Transacti on Amount": "7,000.00",
+      "Dispute d Amount": "5,000.00",
+      "Referen ce No / Remark s": "Lien Amount: 0, Ack no: 3190826 0174108, Root_UT R: 0476995 92609, Lien_Sta t us: No Amount Kept on",
+      "Action Taken By": "Bank of Baroda",
+      "Date of Action": "12/08/202 6 10:40:01"
+    },
+    {
+      "S No.": "15",
+      "Bank /FIs": "Ratnakar Bank Limited",
+      "Account No./IFSC Code": "5830017208 RATN00090 Layer :3",
+      "Transac tion ID / UTR Number": "089826950 204",
+      "Transac tion Date & Time": "29/06/202 6 21:57:PM",
+      "Transacti on Amount": "3,000.00",
+      "Dispute d Amount": "2,643.20",
+      "Referen ce No / Remark s": "UPI/SAT RAJ GLOBAL /RATN/9 4 6926502 004/Pay to SATRA",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/202 6 10:42:31"
+    },
+    {
+      "S No.": "16",
+      "Bank /FIs": "Kotak Mahindra Bank",
+      "Account No./IFSC Code": "87478916 KKBK000065 0 Layer :3",
+      "Transac tion ID / UTR Number": "780341217 880",
+      "Transac tion Date & Time": "29/06/202 6 22:52:PM",
+      "Transacti on Amount": "2,500.00",
+      "Dispute d Amount": "2,356.80",
+      "Referen ce No / Remark s": "UPI/MAD AN DEVIDA S /KKBK/6 1 8069178",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/202 6 10:42:31"
+    },
+    {
+      "S No.": "17",
+      "Bank /FIs": "Kotak Mahindra Bank",
+      "Account No./IFSC Code": "87478916 KKBK000065 0 Layer :3",
+      "Transac tion ID / UTR Number": "788250768 860",
+      "Transac tion Date & Time": "29/06/202 6 22:52:PM",
+      "Transacti on Amount": "2,500.00",
+      "Dispute d Amount": "2,353.82",
+      "Referen ce No / Remark s": "UPI/MAD AN DEVIDA S /KKBK/6 1 8069178 860/UPI",
+      "Action Taken By": "Kotak Mahindra Bank",
+      "Date of Action": "12/08/202 6 10:42:31"
+    },
+    {
+      "S No.": "18",
+      "Bank /FIs": "AIRPAY",
+      "Account No./IFSC Code": "5830017208 Layer :4",
+      "Transac tion ID / UTR Number": "994265602 304",
+      "Transac tion Date & Time": "29/06/202 6 00:00:AM",
+      "Transacti on Amount": "3,000.00",
+      "Dispute d Amount": "2,643.20",
+      "Referen ce No / Remark s": "UPI/SAT RAJGLO BAL/RA TN/9469 2650200 4/Pay to SATRA",
+      "Action Taken By": "Ratnakar Bank Limited",
+      "Date of Action": "12/08/202 6 10:43:46"
+    },
+    {
+      "S No.": "19",
+      "Bank /FIs": "Fino Payments Bank",
+      "Account No./IFSC Code": "203957915 FINO00001 Layer :2",
+      "Transac tion ID / UTR Number": "623220293 443",
+      "Transac tion Date & Time": "01/07/202 6 15:45:PM",
+      "Transacti on Amount": "5,000.00",
+      "Dispute d Amount": "5,000.00",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Jio Payment s Bank Ltd",
+      "Date of Action": "12/08/202 6 11:22:28"
+    },
+    {
+      "S No.": "20",
+      "Bank /FIs": "Punjab National Bank",
+      "Account No./IFSC Code": "9750427169 PUNB02550 Layer :3",
+      "Transac tion ID / UTR Number": "122320675 553",
+      "Transac tion Date & Time": "01/07/202 6 09:26:AM",
+      "Transacti on Amount": "2,000.00",
+      "Dispute d Amount": "2,000.00",
+      "Referen ce No / Remark s": "Stateme n t Ending Balance =2274.77",
+      "Action Taken By": "Fino Payment s Bank",
+      "Date of Action": ""
+    },
+    {
+      "S No.": "21",
+      "Bank /FIs": "Others (Statemen t Ending Balance =4274.77)",
+      "Account No./IFSC Code": "AHBASHZS3 72RA ZCEDU5DQK BGQ P6Q PPIW884207 Layer :3",
+      "Transac tion ID / UTR Number": "987567459 155",
+      "Transac tion Date & Time": "01/07/202 6 09:24:AM",
+      "Transacti on Amount": "1,999.30",
+      "Dispute d Amount": "725.23",
+      "Referen ce No / Remark s": "Stateme n t Ending Balance =4274.77",
+      "Action Taken By": "Fino Payment s Bank",
+      "Date of Action": "12/08/202 6 11:30:01"
+    },
+    {
+      "S No.": "22",
+      "Bank /FIs": "Bank of India",
+      "Account No./IFSC Code": "83671091014 BKID05405 Layer :3",
+      "Transac tion ID / UTR Number": "195724202 133",
+      "Transac tion Date & Time": "01/07/202 6 11:06:AM",
+      "Transacti on Amount": "1,998.27",
+      "Dispute d Amount": "1,998.27",
+      "Referen ce No / Remark s": "Stateme nt Ending",
+      "Action Taken By": "Fino Payment s",
+      "Date of Action": "12/08/202 6 11:30:01"
+    },
+    {
+      "S No.": "",
+      "Bank /FIs": "",
+      "Account No./IFSC Code": "",
+      "Transac tion ID / UTR Number": "",
+      "Transac tion Date & Time": "",
+      "Transacti on Amount": "",
+      "Dispute d Amount": "",
+      "Referen ce No / Remark s": "Balance =276.50",
+      "Action Taken By": "Bank",
+      "Date of Action": ""
+    },
+    {
+      "S No.": "23",
+      "Bank /FIs": "Airtel Payments Bank",
+      "Account No./IFSC Code": "91170118 AIRP00001 Layer :4",
+      "Transac tion ID / UTR Number": "231680834 270",
+      "Transac tion Date & Time": "01/07/20 26 11:59:AM",
+      "Transacti on Amount": "10,000.00",
+      "Dispute d Amount": "1,362.68",
+      "Referen ce No / Remark s": "UPI:DR: P 2A:N:MO BIN",
+      "Action Taken By": "Punjab National Bank",
+      "Date of Action": "12/08/202 6 11:35:01"
+    },
+    {
+      "S No.": "24",
+      "Bank /FIs": "NSDL Payments Bank Ltd",
+      "Account No./IFSC Code": "07610415254 NSPB0002 Layer :5",
+      "Transac tion ID / UTR Number": "152386462 899",
+      "Transac tion Date & Time": "01/07/202 6 12:33:PM",
+      "Transacti on Amount": "2,000.00",
+      "Dispute d Amount": "1,312.68",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Airtel Payment s Bank",
+      "Date of Action": "12/08/202 6 11:40:01"
+    },
+    {
+      "S No.": "25",
+      "Bank /FIs": "Jio Payments Bank Ltd",
+      "Account No./IFSC Code": "98533217163 37 JIOP0001 Layer :4",
+      "Transac tion ID / UTR Number": "821203561 213",
+      "Transac tion Date & Time": "01/07/202 6 12:07:PM",
+      "Transacti on Amount": "1,934.00",
+      "Dispute d Amount": "1,934.00",
+      "Referen ce No / Remark s": "Money Transfer Through UPI.",
+      "Action Taken By": "Bank of India",
+      "Date of Action": "12/08/202 6 12:05:01"
+    },
+    {
+      "S No.": "26",
+      "Bank /FIs": "Bank of India",
+      "Account No./IFSC Code": "94750013245 2 BKID00975 Layer :5",
+      "Transac tion ID / UTR Number": "984211432 4336",
+      "Transac tion Date & Time": "01/07/202 6 13:34:PM",
+      "Transacti on Amount": "500.00",
+      "Dispute d Amount": "500.00",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Jio Payment s Bank Ltd",
+      "Date of Action": "12/08/202 6 13:38:57"
+    },
+    {
+      "S No.": "27",
+      "Bank /FIs": "India Post Payments Bank",
+      "Account No./IFSC Code": "0661021988 IPOS0001 Layer :5",
+      "Transac tion ID / UTR Number": "587090729 707",
+      "Transac tion Date & Time": "01/07/202 6 13:06:PM",
+      "Transacti on Amount": "499.60",
+      "Dispute d Amount": "499.60",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Jio Payment s Bank Ltd",
+      "Date of Action": "12/08/202 6 13:38:57"
+    },
+    {
+      "S No.": "28",
+      "Bank /FIs": "Punjab National Bank",
+      "Account No./IFSC Code": "86400010480 6 PUNB05400 Layer :5",
+      "Transac tion ID / UTR Number": "209163343 324",
+      "Transac tion Date & Time": "01/07/202 6 13:03:PM",
+      "Transacti on Amount": "499.90",
+      "Dispute d Amount": "499.90",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Jio Payment s Bank Ltd",
+      "Date of Action": "12/08/202 6 13:38:57"
+    },
+    {
+      "S No.": "29",
+      "Bank /FIs": "Yes Bank",
+      "Account No./IFSC Code": "9142500051 YESB0PTMU PI Layer :5",
+      "Transac tion ID / UTR Number": "405222758 387",
+      "Transac tion Date & Time": "01/07/202 6 14:27:PM",
+      "Transacti on Amount": "500.00",
+      "Dispute d Amount": "434.30",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Jio Payment s Bank Ltd",
+      "Date of Action": "12/08/202 6 13:38:57"
+    },
+    {
+      "S No.": "30",
+      "Bank /FIs": "Paytm",
+      "Account No./IFSC Code": "9142500051 YESB0PTMU PI Layer :6",
+      "Transac tion ID / UTR Number": "401542392 273",
+      "Transac tion Date & Time": "01/07/202 6 14:27:PM",
+      "Transacti on Amount": "500.00",
+      "Dispute d Amount": "434.30",
+      "Referen ce No / Remark s": "",
+      "Action Taken By": "Yes Bank",
+      "Date of Action": "12/08/202 6 13:40:02"
+    }
+  ]
+}
+
+no_action_references.json
+{
+  "table": "no_action_references",
+  "columns": [
+    "S No.",
+    "Reference No / Remarks",
+    "Action Taken By",
+    "Date of Action"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "Reference No / Remarks": "",
+      "Action Taken By": "State Bank of India",
+      "Date of Action": "12/08/2026 00:05:01"
+    },
+    {
+      "S No.": "2",
+      "Reference No / Remarks": "",
+      "Action Taken By": "HDFC Bank",
+      "Date of Action": "12/08/2026 00:15:01"
+    },
+    {
+      "S No.": "3",
+      "Reference No / Remarks": "",
+      "Action Taken By": "Punjab National Bank",
+      "Date of Action": "12/08/2026 11:01:52"
+    },
+    {
+      "S No.": "4",
+      "Reference No / Remarks": "",
+      "Action Taken By": "Fino Payments Bank",
+      "Date of Action": "12/08/2026 11:30:01"
+    },
+    {
+      "S No.": "5",
+      "Reference No / Remarks": "",
+      "Action Taken By": "Airtel Payments Bank",
+      "Date of Action": "12/08/2026 11:40:01"
+    },
+    {
+      "S No.": "6",
+      "Reference No / Remarks": "",
+      "Action Taken By": "Punjab National Bank",
+      "Date of Action": "12/08/2026 17:13:28"
+    },
+    {
+      "S No.": "7",
+      "Reference No / Remarks": "",
+      "Action Taken By": "Paytm",
+      "Date of Action": "12/08/2026 22:17:16"
+    },
+    {
+      "S No.": "8",
+      "Reference No / Remarks": "",
+      "Action Taken By": "India Post Payments Bank",
+      "Date of Action": "12/08/2026 22:17:16"
+    }
+  ]
+}
+
+
+pending_transactions.json
+
+{
+  "table": "pending_transactions",
+  "columns": [
+    "S No.",
+    "Bank",
+    "No. of Transaction Pending",
+    "Amount Pending",
+    "Pending From"
+  ],
+  "rows": [
+    {
+      "S No.": "1",
+      "Bank": "NSDL Payments Bank Ltd",
+      "No. of Transaction Pending": "",
+      "Amount Pending": "2,000.00",
+      "Pending From": "12/08/2026 11:40:01"
+    }
+  ]
+}

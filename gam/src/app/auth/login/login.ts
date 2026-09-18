@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environment';
 import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth/auth-service';
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -17,6 +18,7 @@ import { Router } from '@angular/router';
 export class Login {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private auth = inject(AuthService);
 
   form = new FormGroup({
     email: new FormControl('', [Validators.required, Validators.email]),
@@ -50,6 +52,10 @@ export class Login {
       );
 
       this.successMessage = response?.message || 'Logged in successfully!';
+
+      // Stamp auth state NOW so authGuard uses cached value instead of
+      // racing a fresh /auth/me call against the brand-new cookie.
+      this.auth.setAuthenticated();
 
       await this.router.navigate(['/dashboard']);
 

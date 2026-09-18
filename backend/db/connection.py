@@ -45,7 +45,7 @@ def _build_pool() -> pooling.MySQLConnectionPool:
         pool_reset_session=True,
         host=os.environ["DB_HOST"],
         port=int(os.environ.get("DB_PORT", 3306)),
-        database=os.environ["DB_NAME"],
+        database=os.environ["DB_NAME"], 
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
         charset="utf8mb4",

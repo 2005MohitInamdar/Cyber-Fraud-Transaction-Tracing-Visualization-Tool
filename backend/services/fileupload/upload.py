@@ -33,9 +33,10 @@ import pathlib
 import shutil
 from pydantic import BaseModel
 from typing import List
-
+from fastapi import Request
 from db.connection import get_connection, get_redis
-
+from services.pdf_extraction.extractor import extract_tables
+from services.pdf_extraction.wrapper import run_pipeline
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 
@@ -201,6 +202,7 @@ def _received_key(upload_id: str) -> str:
 # ─── Chunk-receive Service ────────────────────────────────────────────────────
 
 def receive_chunk(
+    request:Request,
     upload_id: str,
     chunk_number: int,
     chunk_bytes: bytes,
@@ -345,6 +347,7 @@ def receive_chunk(
         print(f"{'═' * 60}\n")
 
         finalise_result = _assemble_and_finalise(
+            request,
             upload_id=upload_id,
             file_name=session_meta.fileName,
             total_chunks=session_meta.totalChunks,
@@ -366,6 +369,7 @@ def receive_chunk(
 # ─── Assembly + Finalisation ──────────────────────────────────────────────────
 
 def _assemble_and_finalise(
+    request:Request,
     upload_id: str,
     file_name: str,
     total_chunks: int,
@@ -397,9 +401,16 @@ def _assemble_and_finalise(
     """
 
     # ── 1. Assemble temp parts into final file ────────────────────────────────
-    tmp_dir   = CHUNKS_TMP_DIR / upload_id
-    out_name  = f"{upload_id}_{file_name}"
-    out_path  = UPLOADS_DIR / out_name
+
+    print("\n\n", request , "\n\n")
+    tmp_dir = CHUNKS_TMP_DIR / upload_id
+
+    # Normalise filename: replace spaces with underscores so downstream tools
+    # (pdfplumber, etc.) don't have issues with spaces in Windows paths.
+    safe_file_name = file_name.replace(" ", "_")
+
+    out_name = f"{upload_id}_{safe_file_name}"
+    out_path = UPLOADS_DIR / out_name
 
     print(f"  🔧  Assembling {total_chunks} chunk(s) → {out_path}")
 
@@ -418,7 +429,7 @@ def _assemble_and_finalise(
 
     # ── 2. Clean up temp directory ────────────────────────────────────────────
     shutil.rmtree(tmp_dir, ignore_errors=True)
-    print(f"  🗑️   Removed temp directory: {tmp_dir}")
+    print(f"  Removed temp directory: {tmp_dir}")
 
     # ── 3. UPDATE MySQL file_upload_sessions ──────────────────────────────────
     received_chunks_json = json.dumps(list(range(1, total_chunks + 1)))
@@ -438,7 +449,7 @@ def _assemble_and_finalise(
                 ),
             )
             print(
-                f"  ✔  MySQL updated — upload_id='{upload_id}' "
+                f"  MySQL updated — upload_id='{upload_id}' "
                 f"status=complete, file_path='{relative_file_path}'"
             )
 
@@ -446,8 +457,46 @@ def _assemble_and_finalise(
             cur.execute(_SELECT_SESSION, (upload_id,))
             session_row = cur.fetchone()
 
+    # ── 5. PDF extraction pipeline ────────────────────────────────────────────
+    # Only run for PDF files. Each upload gets its own output subdirectory
+    # under uploads/extracted/<upload_id>/ to avoid collisions between
+    # concurrent uploads.
+    extraction_result: dict = {}
+    if safe_file_name.lower().endswith(".pdf"):
+        extracted_dir = UPLOADS_DIR / "extracted"
+        extracted_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            print(f"\n  Starting PDF extraction for upload_id='{upload_id}'...")
+            # written = extract_tables(
+            #     pdf_path=out_path,
+            #     output_dir=extracted_dir,
+            # )
+            written = run_pipeline(
+                request,
+                pdf_path=out_path,
+                output_root=extracted_dir,
+            )
+            print(f"  PDF extraction complete — {len(written)} table(s) written to {extracted_dir}")
+            extraction_result = {
+                "extractionStatus": "complete",
+                "tablesExtracted":  len(written),
+                "extractedDir":     str(extracted_dir.relative_to(_BACKEND_DIR)).replace("\\", "/"),
+            }
+        except Exception as exc:
+            import traceback
+            print(f"  [EXTRACTION ERROR] {exc}")
+            traceback.print_exc()
+            extraction_result = {
+                "extractionStatus": "failed",
+                "extractionError":  str(exc),
+            }
+    else:
+        print(f"  Skipping PDF extraction — file is not a PDF ({file_name})")
+        extraction_result = {"extractionStatus": "skipped"}
+
     return {
         "finalised":    True,
         "filePath":     relative_file_path,
         "mysqlSession": session_row,
+        **extraction_result,
     }

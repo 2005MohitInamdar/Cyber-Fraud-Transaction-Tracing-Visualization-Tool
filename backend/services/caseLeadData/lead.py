@@ -54,6 +54,14 @@ def receive_lead_data(lead: CaseLeadOfficer, user_id: str, upload_id: str) -> di
     print(f"  UploadID: {upload_id}")
     print("────────────────────────────────────────────────────────\n")
 
+    # try:
+    #     user_id = get_current_user(access_token)
+    # except ValueError as e:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED,
+    #         detail=str(e),
+    #     )
+        
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(

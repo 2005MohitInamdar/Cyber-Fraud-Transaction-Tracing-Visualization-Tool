@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { NewFraudCase } from '../new-fraud-case/new-fraud-case';
 import { NewCaseData } from '../../services/new-case-data';
+import { AuthService } from '../../services/auth/auth-service';
 
 @Component({
   selector: 'app-dashboard',
@@ -17,10 +18,14 @@ export class Dashboard {
   casesCompletedTransactions: number = 79;
   casesIncompleteNodes: number = 22;
 
-  constructor(private newCaseData: NewCaseData) {}
+  constructor(
+    private newCaseData: NewCaseData,
+    private auth: AuthService,
+  ) {}
 
+  /** Calls backend to clear the HttpOnly cookie, then navigates to /login. */
   signOut(): void {
-    console.log('signout');
+    this.auth.logout();
   }
 
   // Calls service to open modal — no more showNewCaseModal boolean here
@@ -28,3 +33,4 @@ export class Dashboard {
     this.newCaseData.openModal();
   }
 }
+

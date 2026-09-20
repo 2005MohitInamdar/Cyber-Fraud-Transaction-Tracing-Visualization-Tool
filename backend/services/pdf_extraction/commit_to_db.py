@@ -95,18 +95,21 @@ def build_row_insert(table: str, columns: list) -> str:
     return f"INSERT INTO `{table}` ({col_list}) VALUES ({placeholders})"
 
 
-def insert_row_table(cursor, table: str, payload: dict, user_id:str) -> int:
-    columns = payload.get("columns", [])
-    columns.append("supabase_user_id")
+def insert_row_table(
+    cursor, table: str, payload: dict, user_id: str, upload_id: str
+) -> int:
+    """Insert extracted rows and associate every row with its upload."""
+    # Do not mutate the JSON payload's column list: it can be reused by a
+    # caller, and the database-specific ownership columns belong only here.
+    columns = [*payload.get("columns", []), "supabase_user_id", "upload_id"]
 
     rows = payload.get("rows", [])
     if not columns or not rows:
         return 0
 
     sql = build_row_insert(table, columns)
-    # values = [tuple(row.get(col) for col in columns) for row in rows]
     values = [
-        tuple(row.get(col) for col in columns[:-1]) + (user_id,)
+        tuple(row.get(col) for col in columns[:-2]) + (user_id, upload_id)
         for row in rows
     ]
 
@@ -114,7 +117,9 @@ def insert_row_table(cursor, table: str, payload: dict, user_id:str) -> int:
     return cursor.rowcount
 
 
-def insert_meta_table(cursor, table: str, payload: dict, user_id:str) -> int:
+def insert_meta_table(
+    cursor, table: str, payload: dict, user_id: str, upload_id: str
+) -> int:
     """complaint_meta: single key/value record, one INSERT."""
     data = payload.get("data", {})
     # columns.append("supabase_user_id")
@@ -122,10 +127,8 @@ def insert_meta_table(cursor, table: str, payload: dict, user_id:str) -> int:
     if not data:
         return 0
 
-    columns = list(data.keys())
-    columns.append("supabase_user_id")
-    # values = [data[c] for c in columns]
-    values = [data[c] for c in columns[:-1]] + [user_id]
+    columns = [*data.keys(), "supabase_user_id", "upload_id"]
+    values = [data[c] for c in columns[:-2]] + [user_id, upload_id]
 
     sql = build_row_insert(table, columns)
     cursor.execute(sql, values)
@@ -133,7 +136,7 @@ def insert_meta_table(cursor, table: str, payload: dict, user_id:str) -> int:
 
 
 
-def load_all(user_id:str, db_schema_dir: str) -> dict:
+def load_all(user_id: str, upload_id: str, db_schema_dir: str) -> dict:
     payloads = load_json_files(db_schema_dir)
     
     conn = get_connection()
@@ -149,9 +152,9 @@ def load_all(user_id:str, db_schema_dir: str) -> dict:
 
             try:
                 if table == "complaint_meta":
-                    inserted = insert_meta_table(cursor, table, payload, user_id)
+                    inserted = insert_meta_table(cursor, table, payload, user_id, upload_id)
                 else:
-                    inserted = insert_row_table(cursor, table, payload, user_id)
+                    inserted = insert_row_table(cursor, table, payload, user_id, upload_id)
                 conn.commit()
                 results[table] = inserted
                 print(f"  [load] {table:<24} {inserted} row(s) inserted")

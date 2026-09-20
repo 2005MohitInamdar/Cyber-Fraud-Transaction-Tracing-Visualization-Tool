@@ -149,10 +149,8 @@ from .extractor import extract_tables
 from .normalization import normalize_directory
 from .correct_columns import map_directory
 from .commit_to_db import load_all
-from ..auth import get_current_user
-from fastapi import Request, HTTPException, status
 
-def run_pipeline(request:Request, pdf_path, output_root=None) -> dict:
+def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> dict:
     pdf_path = Path(pdf_path)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
@@ -207,20 +205,9 @@ def run_pipeline(request:Request, pdf_path, output_root=None) -> dict:
 
     print("Pushing to database")
 
-    _COOKIE_NAME = "access_token"
-    access_token = request.cookies.get(_COOKIE_NAME)
-    
-    if not access_token:
-        raise ValueError("No access token provided.")
-    
-    try:
-        user_id = get_current_user(access_token)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
-    load_all(user_id, db_schema_dir)
+    # The request was authenticated before chunk handling. Keep both IDs
+    # explicit so all extracted records are linked to the exact case upload.
+    load_results = load_all(user_id, upload_id, db_schema_dir)
 
     return {
         "raw_dir": raw_dir,
@@ -231,6 +218,7 @@ def run_pipeline(request:Request, pdf_path, output_root=None) -> dict:
         "mapped": mapped,
         "escalations": escalations,
         "review_flags": review_flags,
+        "load_results": load_results,
     }
 
 
@@ -264,14 +252,16 @@ def _collect_review_flags(db_schema_dir: Path) -> dict:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python run_pipeline.py <path_to_pdf> [output_root]")
+    if len(sys.argv) < 4:
+        print("Usage: python run_pipeline.py <path_to_pdf> <user_id> <upload_id> [output_root]")
         sys.exit(1)
 
     pdf_path = sys.argv[1]
-    output_root = sys.argv[2] if len(sys.argv) >= 3 else None
+    user_id = sys.argv[2]
+    upload_id = sys.argv[3]
+    output_root = sys.argv[4] if len(sys.argv) >= 5 else None
 
-    result = run_pipeline(pdf_path, output_root)
+    result = run_pipeline(pdf_path, user_id, upload_id, output_root)
     sys.exit(1 if (result["escalations"] or result["review_flags"]) else 0)
 
 

@@ -1,0 +1,25 @@
+{
+  "table": "pending_transactions",
+  "columns": [
+    "s_no",
+    "bank",
+    "no_of_transactions_pending",
+    "amount_pending",
+    "pending_from"
+  ],
+  "rows": [
+    {
+      "s_no": 1,
+      "bank": "NSDL Payments Bank Ltd",
+      "no_of_transactions_pending": null,
+      "amount_pending": "2000.00",
+      "pending_from": "2026-08-12 11:40:01"
+    }
+  ],
+  "_schema_mapping": {
+    "kind": "rows",
+    "rows": 1,
+    "unparsed_datetimes": [],
+    "status": "ok"
+  }
+}

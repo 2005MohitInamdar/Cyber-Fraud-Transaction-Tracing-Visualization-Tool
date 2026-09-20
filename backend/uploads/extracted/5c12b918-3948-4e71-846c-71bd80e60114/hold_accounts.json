@@ -1,0 +1,128 @@
+{
+  "table": "hold_accounts",
+  "columns": [
+    "s_no",
+    "account_no",
+    "hold_date",
+    "hold_amount",
+    "reference_remarks",
+    "action_taken_by",
+    "date_of_action"
+  ],
+  "rows": [
+    {
+      "s_no": 1,
+      "account_no": "007910270534",
+      "hold_date": "2026-08-11",
+      "hold_amount": "500.00",
+      "reference_remarks": "",
+      "action_taken_by": "India Post Payments Bank",
+      "date_of_action": "2026-08-11 13:30:19"
+    },
+    {
+      "s_no": 2,
+      "account_no": "37658595609",
+      "hold_date": "2026-08-11",
+      "hold_amount": "8980.65",
+      "reference_remarks": "Hold(s) Exist due to statutory dues, etc.",
+      "action_taken_by": "State Bank of India",
+      "date_of_action": "2026-08-12 00:05:01"
+    },
+    {
+      "s_no": 3,
+      "account_no": "3850196084",
+      "hold_date": "2026-08-11",
+      "hold_amount": "119.20",
+      "reference_remarks": "Lien Marked :119.2, Amount on Hold : 119.2",
+      "action_taken_by": "Kotak Mahindra Bank",
+      "date_of_action": "2026-08-12 00:08:22"
+    },
+    {
+      "s_no": 4,
+      "account_no": "50100579845036",
+      "hold_date": "2026-08-11",
+      "hold_amount": "2818.31",
+      "reference_remarks": "Put on Hold",
+      "action_taken_by": "HDFC Bank",
+      "date_of_action": "2026-08-12 00:15:01"
+    },
+    {
+      "s_no": 5,
+      "account_no": "925010001278861",
+      "hold_date": "2026-08-12",
+      "hold_amount": "18049.84",
+      "reference_remarks": "Lien marked for the disputed amount",
+      "action_taken_by": "Axis Bank",
+      "date_of_action": "2026-08-12 00:20:24"
+    },
+    {
+      "s_no": 6,
+      "account_no": "6049004559",
+      "hold_date": "2026-06-29",
+      "hold_amount": "2.98",
+      "reference_remarks": "Lien Marked :2.98, Amount on Hold : 2.98",
+      "action_taken_by": "Kotak Mahindra Bank",
+      "date_of_action": "2026-08-12 10:42:31"
+    },
+    {
+      "s_no": 7,
+      "account_no": "1846478916",
+      "hold_date": "2026-08-07",
+      "hold_amount": "2356.80",
+      "reference_remarks": "Lien Marked :2356.8, Amount on Hold : 2356.8",
+      "action_taken_by": "Kotak Mahindra Bank",
+      "date_of_action": "2026-08-12 10:46:37"
+    },
+    {
+      "s_no": 8,
+      "account_no": "1846478916",
+      "hold_date": "2026-07-25",
+      "hold_amount": "2353.82",
+      "reference_remarks": "Lien Marked :2353.82, Amount on Hold : 2353.82",
+      "action_taken_by": "Kotak Mahindra Bank",
+      "date_of_action": "2026-08-12 10:46:37"
+    },
+    {
+      "s_no": 9,
+      "account_no": "2550000100427169",
+      "hold_date": "2026-08-12",
+      "hold_amount": "637.32",
+      "reference_remarks": "NCRP: Lien marked on account",
+      "action_taken_by": "Punjab National Bank",
+      "date_of_action": "2026-08-12 11:35:01"
+    },
+    {
+      "s_no": 10,
+      "account_no": "540510110014301",
+      "hold_date": "2026-08-12",
+      "hold_amount": "21.42",
+      "reference_remarks": "LIEN MARKED WITH LIEN ID BI34195073",
+      "action_taken_by": "Bank of India",
+      "date_of_action": "2026-08-12 12:05:01"
+    },
+    {
+      "s_no": 11,
+      "account_no": "497510110001372",
+      "hold_date": "2026-08-12",
+      "hold_amount": "500.00",
+      "reference_remarks": "LIEN MARKED WITH LIEN ID BI34203787",
+      "action_taken_by": "Bank of India",
+      "date_of_action": "2026-08-12 14:35:01"
+    },
+    {
+      "s_no": 12,
+      "account_no": "2541109900110192",
+      "hold_date": "2026-08-13",
+      "hold_amount": "2643.20",
+      "reference_remarks": "9469265020 04 Lien has been placed due to a disputed transaction",
+      "action_taken_by": "AIRPAY",
+      "date_of_action": "2026-08-13 20:28:34"
+    }
+  ],
+  "_schema_mapping": {
+    "kind": "rows",
+    "rows": 12,
+    "unparsed_datetimes": [],
+    "status": "ok"
+  }
+}

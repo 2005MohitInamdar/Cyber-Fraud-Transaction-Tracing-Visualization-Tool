@@ -206,7 +206,7 @@ async def upload_chunk_route(
     # ── 1. Validate auth cookie ───────────────────────────────────────────────
     access_token = request.cookies.get("access_token")
     try:
-        get_current_user(access_token)
+        user_id = get_current_user(access_token)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -221,8 +221,14 @@ async def upload_chunk_route(
         result = receive_chunk(
             request,
             upload_id=uploadId,
+            user_id=user_id,
             chunk_number=chunkNumber,
             chunk_bytes=chunk_bytes,
+        )
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
         )
     except ValueError as e:
         raise HTTPException(

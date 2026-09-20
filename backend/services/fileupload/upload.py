@@ -204,6 +204,7 @@ def _received_key(upload_id: str) -> str:
 def receive_chunk(
     request:Request,
     upload_id: str,
+    user_id: str,
     chunk_number: int,
     chunk_bytes: bytes,
 ) -> dict:
@@ -229,7 +230,18 @@ def receive_chunk(
     ValueError – if the SHA-256 hash of the received bytes doesn't match
     """
 
-    # ── 1. Load session metadata from Redis ──────────────────────────────────
+    # ── 1. Confirm this authenticated user owns the upload ───────────────────
+    with get_connection() as conn:
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(_SELECT_SESSION, (upload_id,))
+            session = cur.fetchone()
+
+    if session is None:
+        raise ValueError(f"No upload session found for uploadId='{upload_id}'.")
+    if session["supabase_user_id"] != user_id:
+        raise PermissionError("You do not have permission to upload chunks to this case.")
+
+    # ── 2. Load session metadata from Redis ──────────────────────────────────
     r = get_redis()
     redis_key = _metadata_key(upload_id)
     raw = r.get(redis_key)
@@ -242,7 +254,7 @@ def receive_chunk(
 
     session_meta = FileUploadMetadata.model_validate_json(raw)
 
-    # ── 2. Find expected ChunkMetadata for this chunk number ─────────────────
+    # ── 3. Find expected ChunkMetadata for this chunk number ─────────────────
     expected_chunk = next(
         (c for c in session_meta.chunks if c.chunkNumber == chunk_number),
         None,
@@ -255,11 +267,11 @@ def receive_chunk(
             f"Valid chunks: 1–{session_meta.totalChunks}"
         )
 
-    # ── 3. Verify SHA-256 hash ────────────────────────────────────────────────
+    # ── 4. Verify SHA-256 hash ────────────────────────────────────────────────
     received_hash = hashlib.sha256(chunk_bytes).hexdigest()
     hash_ok = received_hash == expected_chunk.hash
 
-    # ── 4. Print detailed receipt ─────────────────────────────────────────────
+    # ── 5. Print detailed receipt ─────────────────────────────────────────────
     print(f"\n{'─' * 60}")
     print(f"  📦  Chunk received  [{chunk_number}/{session_meta.totalChunks}]")
     print(f"  uploadId     : {upload_id}")
@@ -278,7 +290,7 @@ def receive_chunk(
             f"expected={expected_chunk.hash}, got={received_hash}"
         )
 
-    # ── 5. Save chunk receipt to Redis Hash + raw bytes to temp file ───────────
+    # ── 6. Save chunk receipt to Redis Hash + raw bytes to temp file ───────────
     #  Redis Hash  : upload:{upload_id}:received
     #    field = str(chunkNumber),  value = JSON receipt
     #  Temp file   : uploads/.tmp/{upload_id}/{chunk_number}.bin
@@ -305,34 +317,10 @@ def receive_chunk(
         f"({chunks_received_so_far}/{session_meta.totalChunks} received so far)"
     )
 
-    # ── 6. Update file metadata in Redis with received chunk progress ─────────
-    #  Re-read the metadata, append this chunk to the received list, update
-    #  totalChunks to the running count, then write it back with the same TTL.
-    raw_refreshed = r.get(redis_key)
-    if raw_refreshed is not None:
-        meta_dict = json.loads(raw_refreshed)
-
-        # Append the received ChunkMetadata (only if not already present)
-        already_recorded = any(
-            c.get("chunkNumber") == chunk_number
-            for c in meta_dict.get("chunks", [])
-        )
-        if not already_recorded:
-            meta_dict["chunks"].append({
-                "chunkNumber": chunk_number,
-                "size":        len(chunk_bytes),
-                "hash":        received_hash,
-            })
-
-        # Update totalChunks to the number of chunks received so far
-        meta_dict["totalChunks"] = int(chunks_received_so_far)
-
-        r.set(redis_key, json.dumps(meta_dict), ex=CHUNK_TTL_SECONDS)
-        print(
-            f"  🔄  Updated file metadata in Redis — "
-            f"totalChunks={meta_dict['totalChunks']}, "
-            f"chunks received: {[c['chunkNumber'] for c in meta_dict['chunks']]}"
-        )
+    # Keep the metadata immutable: it contains the expected chunk count and
+    # hashes. Replacing totalChunks with the received count caused multi-chunk
+    # uploads to be finalized after only the first few chunks.
+    r.expire(redis_key, CHUNK_TTL_SECONDS)
 
     # ── 7. Check if all chunks are in — assemble + finalise if so ───────────────
     all_done = chunks_received_so_far >= session_meta.totalChunks
@@ -349,6 +337,7 @@ def receive_chunk(
         finalise_result = _assemble_and_finalise(
             request,
             upload_id=upload_id,
+            user_id=user_id,
             file_name=session_meta.fileName,
             total_chunks=session_meta.totalChunks,
         )
@@ -371,6 +360,7 @@ def receive_chunk(
 def _assemble_and_finalise(
     request:Request,
     upload_id: str,
+    user_id: str,
     file_name: str,
     total_chunks: int,
 ) -> dict:
@@ -463,7 +453,7 @@ def _assemble_and_finalise(
     # concurrent uploads.
     extraction_result: dict = {}
     if safe_file_name.lower().endswith(".pdf"):
-        extracted_dir = UPLOADS_DIR / "extracted"
+        extracted_dir = UPLOADS_DIR / "extracted" / upload_id
         extracted_dir.mkdir(parents=True, exist_ok=True)
         try:
             print(f"\n  Starting PDF extraction for upload_id='{upload_id}'...")
@@ -472,14 +462,16 @@ def _assemble_and_finalise(
             #     output_dir=extracted_dir,
             # )
             written = run_pipeline(
-                request,
                 pdf_path=out_path,
+                user_id=user_id,
+                upload_id=upload_id,
                 output_root=extracted_dir,
             )
-            print(f"  PDF extraction complete — {len(written)} table(s) written to {extracted_dir}")
+            table_count = len(written["mapped"])
+            print(f"  PDF extraction complete — {table_count} table(s) written to {extracted_dir}")
             extraction_result = {
                 "extractionStatus": "complete",
-                "tablesExtracted":  len(written),
+                "tablesExtracted":  table_count,
                 "extractedDir":     str(extracted_dir.relative_to(_BACKEND_DIR)).replace("\\", "/"),
             }
         except Exception as exc:

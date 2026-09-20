@@ -1,0 +1,65 @@
+{
+  "table": "no_action_references",
+  "columns": [
+    "s_no",
+    "reference_remarks",
+    "action_taken_by",
+    "date_of_action"
+  ],
+  "rows": [
+    {
+      "s_no": 1,
+      "reference_remarks": "",
+      "action_taken_by": "State Bank of India",
+      "date_of_action": "2026-08-12 00:05:01"
+    },
+    {
+      "s_no": 2,
+      "reference_remarks": "",
+      "action_taken_by": "HDFC Bank",
+      "date_of_action": "2026-08-12 00:15:01"
+    },
+    {
+      "s_no": 3,
+      "reference_remarks": "",
+      "action_taken_by": "Punjab National Bank",
+      "date_of_action": "2026-08-12 11:01:52"
+    },
+    {
+      "s_no": 4,
+      "reference_remarks": "",
+      "action_taken_by": "Fino Payments Bank",
+      "date_of_action": "2026-08-12 11:30:01"
+    },
+    {
+      "s_no": 5,
+      "reference_remarks": "",
+      "action_taken_by": "Airtel Payments Bank",
+      "date_of_action": "2026-08-12 11:40:01"
+    },
+    {
+      "s_no": 6,
+      "reference_remarks": "",
+      "action_taken_by": "Punjab National Bank",
+      "date_of_action": "2026-08-12 17:13:28"
+    },
+    {
+      "s_no": 7,
+      "reference_remarks": "",
+      "action_taken_by": "Paytm",
+      "date_of_action": "2026-08-12 22:17:16"
+    },
+    {
+      "s_no": 8,
+      "reference_remarks": "",
+      "action_taken_by": "India Post Payments Bank",
+      "date_of_action": "2026-08-12 22:17:16"
+    }
+  ],
+  "_schema_mapping": {
+    "kind": "rows",
+    "rows": 8,
+    "unparsed_datetimes": [],
+    "status": "ok"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "table": "amount_summary",
+  "columns": [
+    "s_no",
+    "description",
+    "amount"
+  ],
+  "rows": [
+    {
+      "s_no": 1,
+      "description": "Transaction put on hold",
+      "amount": "38983.54"
+    },
+    {
+      "s_no": 2,
+      "description": "Other",
+      "amount": "0.10"
+    },
+    {
+      "s_no": 3,
+      "description": "Others [ <=500]",
+      "amount": "3248.76"
+    }
+  ],
+  "_schema_mapping": {
+    "kind": "rows",
+    "rows": 3,
+    "unparsed_datetimes": [],
+    "status": "ok"
+  }
+}

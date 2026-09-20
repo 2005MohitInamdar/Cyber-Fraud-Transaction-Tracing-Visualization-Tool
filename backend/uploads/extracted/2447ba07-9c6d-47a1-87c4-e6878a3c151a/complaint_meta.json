@@ -1,0 +1,14 @@
+{
+  "table": "complaint_meta",
+  "data": {
+    "complaint_accepted_by": "Login Id: nccrp.aurangabadr Name: nccrp.aurangabadr(DISTRICT)",
+    "complaint_accepted_date": "2026-08-12 11:06:35",
+    "current_status": "Under Process",
+    "under_process_date": "2026-08-12 11:06:35"
+  },
+  "_schema_mapping": {
+    "kind": "key_value",
+    "unparsed_datetimes": [],
+    "status": "ok"
+  }
+}

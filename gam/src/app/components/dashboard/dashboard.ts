@@ -5,6 +5,7 @@ import { NewFraudCase } from '../new-fraud-case/new-fraud-case';
 import { NewCaseData } from '../../services/new-case-data';
 import { AuthService } from '../../services/auth/auth-service';
 import { environment } from '../../environment';
+import { RouterLink } from '@angular/router';
 
 interface DashboardSummary {
   totalFraudCases: number;
@@ -22,7 +23,7 @@ interface FraudCaseCard {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, NewFraudCase],
+  imports: [CommonModule, RouterLink, NewFraudCase],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss'],
 })

@@ -7,6 +7,7 @@ from services.fileupload.upload import FileUploadMetadata, initiate_upload, rece
 from services.caseLeadData.lead import CaseLeadOfficer, receive_lead_data
 from services.dashboard import get_dashboard_summary, get_user_cases
 from services.upload_progress import get_events_for_user, publish
+from services.caseDetail.detail import get_case_detail
 
 # ─── Cookie config (single source of truth) ──────────────────────────────────
 _COOKIE_NAME    = "access_token"
@@ -238,6 +239,24 @@ def upload_progress(request: Request, upload_id: str):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@app.get("/api/cases/{upload_id}", status_code=status.HTTP_200_OK)
+def case_detail(request: Request, upload_id: str):
+    """Return all persisted data for one user-owned fraud case."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+        return get_case_detail(user_id, upload_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        print(f"[CASE DETAIL ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load case detail. Please try again.",
+        )
 
 
 # ─── Chunk Upload Route ───────────────────────────────────────────────────────

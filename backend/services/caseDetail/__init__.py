@@ -1,0 +1,1 @@
+"""Case-detail data access."""

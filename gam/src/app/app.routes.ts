@@ -6,7 +6,7 @@ import { Dashboard } from './components/dashboard/dashboard';
 import { NewFraudCase } from './components/new-fraud-case/new-fraud-case';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
-
+import { CaseDetails } from './components/case-details/case-details';
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
 
@@ -17,6 +17,6 @@ export const routes: Routes = [
 
   // ── Protected routes (redirect to /login if not authenticated) ───────────
   { path: 'dashboard',    component: Dashboard,    canActivate: [authGuard] },
+  { path: 'dashboard/cases/:uploadId', component: CaseDetails, canActivate: [authGuard] },
   { path: 'newFraudCase', component: NewFraudCase, canActivate: [authGuard] },
 ];
-

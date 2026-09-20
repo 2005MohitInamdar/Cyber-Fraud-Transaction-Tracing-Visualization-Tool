@@ -150,6 +150,7 @@ from .normalization import normalize_directory
 from .correct_columns import map_directory
 from .commit_to_db import load_all
 from ..upload_progress import publish
+from ..caseDetail.detail import invalidate_case_detail
 
 def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> dict:
     def progress(message: str, state: str = "processing") -> None:
@@ -221,11 +222,13 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
         if isinstance(result, str) and result.startswith("FAILED:")
     ]
     if failed_tables:
+        invalidate_case_detail(upload_id)
         progress(
             "Processing finished with database errors: " + ", ".join(failed_tables) + ".",
             "failed",
         )
     else:
+        invalidate_case_detail(upload_id)
         progress("Case processing completed successfully.", "complete")
 
     return {

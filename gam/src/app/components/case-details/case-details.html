@@ -1,0 +1,53 @@
+<main class="case-detail-page">
+  <a routerLink="/dashboard" class="back-link">← Back to dashboard</a>
+
+  <p *ngIf="isLoading()" class="state-message">Loading case details…</p>
+  <p *ngIf="loadError()" class="state-message state-message--error">Unable to load this case.</p>
+
+  <ng-container *ngIf="caseDetail() as detail">
+    <header class="case-header">
+      <div>
+        <p class="eyebrow">Fraud case</p>
+        <h1>{{ detail.leadOfficer.inspectorName }}</h1>
+        <p>{{ detail.leadOfficer.inspectorRank }} · {{ detail.leadOfficer.inspectorBranch }}</p>
+      </div>
+      <div class="file-summary">
+        <span class="status">{{ detail.upload.status || 'unknown' }}</span>
+        <strong>{{ detail.upload.fileName || 'Case file' }}</strong>
+        <small>Created {{ detail.upload.createdAt | date:'medium' }}</small>
+      </div>
+    </header>
+
+    <section class="data-section" *ngIf="hasValues(detail.tables.complaintMeta)">
+      <h2>Complaint metadata</h2>
+      <dl class="metadata-list">
+        <ng-container *ngFor="let key of keys(detail.tables.complaintMeta)">
+          <dt>{{ key }}</dt><dd>{{ detail.tables.complaintMeta[key] ?? '—' }}</dd>
+        </ng-container>
+      </dl>
+    </section>
+
+    <ng-container *ngFor="let table of [
+      { title: 'Amount summary', rows: detail.tables.amountSummary },
+      { title: 'Complaint transactions', rows: detail.tables.complaintTransactions },
+      { title: 'Failed transactions', rows: detail.tables.failedTransactions },
+      { title: 'Hold accounts', rows: detail.tables.holdAccounts },
+      { title: 'Lien transactions', rows: detail.tables.lienTransactions },
+      { title: 'No-action references', rows: detail.tables.noActionReferences },
+      { title: 'Pending transactions', rows: detail.tables.pendingTransactions }
+    ]">
+      <section class="data-section">
+        <h2>{{ table.title }}</h2>
+        <p class="no-records" *ngIf="!table.rows.length">No records.</p>
+        <div class="table-wrap" *ngIf="table.rows.length">
+          <table>
+            <thead><tr><th *ngFor="let key of keys(table.rows[0])">{{ key }}</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let row of table.rows"><td *ngFor="let key of keys(table.rows[0])">{{ row[key] ?? '—' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </ng-container>
+  </ng-container>
+</main>

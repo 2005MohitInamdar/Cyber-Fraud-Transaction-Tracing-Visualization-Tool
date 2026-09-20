@@ -112,7 +112,7 @@
     <h3 class="stats-heading">Your cases</h3>
     <p *ngIf="!isLoading() && !cases().length" class="empty-cases">No fraud cases yet. Start one above to see it here.</p>
     <div class="case-list">
-      <article class="case-card" *ngFor="let case of cases()">
+      <article class="case-card" *ngFor="let case of cases()" [routerLink]="['/dashboard/cases', case.uploadId]">
         <span class="case-card-label">Fraud case</span>
         <h4>{{ case.inspectorName }}</h4>
         <p>Created {{ case.createdAt | date:'medium' }}</p>

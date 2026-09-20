@@ -1,19 +1,22 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, signal } from '@angular/core';
 
 @Injectable({
   providedIn: 'root',
 })
 export class NewCaseData {
-  // Replaces @Input() isOpen + @Output() closeModal
-  private _isModalOpen = new BehaviorSubject<boolean>(false);
-  isModalOpen$ = this._isModalOpen.asObservable();
+  readonly isModalOpen = signal(false);
+  /** A monotonically increasing event token for completed case creation. */
+  readonly caseCreated = signal(0);
 
   openModal(): void {
-    this._isModalOpen.next(true);
+    this.isModalOpen.set(true);
   }
 
   closeModal(): void {
-    this._isModalOpen.next(false);
+    this.isModalOpen.set(false);
+  }
+
+  notifyCaseCreated(): void {
+    this.caseCreated.update((version) => version + 1);
   }
 }

@@ -194,7 +194,7 @@ def _classify_table(cleaned_header: list) -> str | None:
     return None
 
 
-def extract_tables(pdf_path, output_dir=None) -> dict:
+def extract_tables(pdf_path, output_dir=None, progress=None) -> dict:
     """
     Open *pdf_path*, extract all known tables (regardless of which pages
     they fall on), write one JSON file per table into *output_dir*, and
@@ -295,6 +295,8 @@ def extract_tables(pdf_path, output_dir=None) -> dict:
             written[table_name] = _save_json(
                 payload, output_dir, _TABLE_FILENAMES[table_name]
             )
+            if progress:
+                progress(f"Extracted {table_name.replace('_', ' ')}.")
 
         # ── complaint_meta: flat key/value dict ────────────────────────────────
         if meta_rows:
@@ -308,6 +310,8 @@ def extract_tables(pdf_path, output_dir=None) -> dict:
             written["complaint_meta"] = _save_json(
                 payload, output_dir, "complaint_meta.json"
             )
+            if progress:
+                progress("Extracted complaint metadata.")
 
     return written
 

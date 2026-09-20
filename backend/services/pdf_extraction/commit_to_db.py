@@ -136,7 +136,7 @@ def insert_meta_table(
 
 
 
-def load_all(user_id: str, upload_id: str, db_schema_dir: str) -> dict:
+def load_all(user_id: str, upload_id: str, db_schema_dir: str, progress=None) -> dict:
     payloads = load_json_files(db_schema_dir)
     
     conn = get_connection()
@@ -157,10 +157,14 @@ def load_all(user_id: str, upload_id: str, db_schema_dir: str) -> dict:
                     inserted = insert_row_table(cursor, table, payload, user_id, upload_id)
                 conn.commit()
                 results[table] = inserted
+                if progress:
+                    progress(f"Saved {inserted} record(s) to {table.replace('_', ' ')}.")
                 print(f"  [load] {table:<24} {inserted} row(s) inserted")
             except MySQLError as e:
                 conn.rollback()
                 results[table] = f"FAILED: {e}"
+                if progress:
+                    progress(f"Could not save {table.replace('_', ' ')}.", "failed")
                 print(f"  [load] {table:<24} FAILED - {e}")
     finally:
         cursor.close()

@@ -1,6 +1,18 @@
 <!-- Modal Overlay -->
-<div class="modal-overlay" *ngIf="isOpen" (click)="onOverlayClick($event)">
+<div class="modal-overlay" *ngIf="isOpen()" (click)="onOverlayClick($event)">
   <div class="modal-panel">
+
+    <div class="processing-screen" *ngIf="isProcessing()" aria-live="polite">
+      <div class="processing-orb"></div>
+      <p class="processing-eyebrow">PROCESSING CASE FILE</p>
+      <h2>{{ progressMessage() }}</h2>
+      <p class="processing-detail">Please keep this window open while we securely process your case data.</p>
+      <div class="processing-steps" *ngIf="progressEvents().length">
+        <span *ngFor="let event of progressEvents().slice(-4)" [class.processing-step--complete]="event.state === 'complete'">
+          {{ event.message }}
+        </span>
+      </div>
+    </div>
 
     <!-- Modal Header -->
     <div class="modal-header">
@@ -20,7 +32,7 @@
           <p class="modal-subtitle">Fill in the lead officer's details and attach the case file</p>
         </div>
       </div>
-      <button class="close-btn" (click)="close()" aria-label="Close modal">
+      <button class="close-btn" (click)="close()" [disabled]="isProcessing()" aria-label="Close modal">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -49,7 +61,8 @@
             class="form-input"
             type="text"
             placeholder="e.g. Inspector Ramesh Kumar"
-            [(ngModel)]="inspectorName"
+            [ngModel]="inspectorName()"
+            (ngModelChange)="inspectorName.set($event)"
           />
         </div>
 
@@ -61,7 +74,8 @@
             class="form-input"
             type="text"
             placeholder="e.g. Inspector, Sub-Inspector"
-            [(ngModel)]="inspectorRank"
+            [ngModel]="inspectorRank()"
+            (ngModelChange)="inspectorRank.set($event)"
           />
         </div>
 
@@ -73,7 +87,8 @@
             class="form-input"
             type="text"
             placeholder="e.g. CBI Branch, Mumbai Central"
-            [(ngModel)]="inspectorBranch"
+            [ngModel]="inspectorBranch()"
+            (ngModelChange)="inspectorBranch.set($event)"
           />
         </div>
       </div>
@@ -97,12 +112,12 @@
       <!-- Drop Zone -->
       <div
         class="drop-zone"
-        [class.drop-zone--active]="isDragging"
-        [class.drop-zone--filled]="selectedFile"
+        [class.drop-zone--active]="isDragging()"
+        [class.drop-zone--filled]="selectedFile()"
         (dragover)="onDragOver($event)"
         (dragleave)="onDragLeave()"
         (drop)="onDrop($event)"
-        *ngIf="!selectedFile"
+        *ngIf="!selectedFile()"
       >
         <div class="drop-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none"
@@ -133,11 +148,11 @@
       </div>
 
       <!-- File Preview -->
-      <div class="file-preview" *ngIf="selectedFile">
+      <div class="file-preview" *ngIf="selectedFile()">
         <span class="file-preview-icon">{{ getFileIcon() }}</span>
         <div class="file-preview-info">
-          <span class="file-preview-name">{{ selectedFile.name }}</span>
-          <span class="file-preview-size">{{ formatFileSize(selectedFile.size) }}</span>
+          <span class="file-preview-name">{{ selectedFile()!.name }}</span>
+          <span class="file-preview-size">{{ formatFileSize(selectedFile()!.size) }}</span>
         </div>
         <button class="file-remove-btn" (click)="removeFile()" aria-label="Remove file">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -151,15 +166,15 @@
 
     <!-- Modal Footer -->
     <div class="modal-footer">
-      <button class="btn-cancel" (click)="close()" [disabled]="isProcessing">Cancel</button>
-      <button class="btn-submit" (click)="createCase()" [disabled]="isProcessing || !selectedFile">
+      <button class="btn-cancel" (click)="close()" [disabled]="isProcessing()">Cancel</button>
+      <button class="btn-submit" (click)="createCase()" [disabled]="isProcessing() || !selectedFile()">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
           <path d="M2 12l10 5 10-5" />
         </svg>
-        {{ isProcessing ? 'Processing…' : 'Create Case' }}
+        {{ isProcessing() ? 'Processing…' : 'Create Case' }}
       </button>
     </div>
 

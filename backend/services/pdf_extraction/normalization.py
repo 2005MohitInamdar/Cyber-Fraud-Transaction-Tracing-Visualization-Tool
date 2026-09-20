@@ -656,7 +656,7 @@ def normalize_table(payload: dict, normalize_slashes: bool = True) -> dict:
 
 
 def normalize_directory(input_dir, output_dir=None,
-                        normalize_slashes: bool = True) -> dict:
+                        normalize_slashes: bool = True, progress=None) -> dict:
     """
     Normalize every ``*.json`` file in *input_dir* that looks like an
     extractor payload. Writes to *output_dir*, or in place when it is None.
@@ -689,6 +689,8 @@ def normalize_directory(input_dir, output_dir=None,
 
         report = result["_normalization"]
         written[result["table"]] = out_path
+        if progress:
+            progress(f"Normalized {result['table'].replace('_', ' ')}.")
         flag = "" if report["recommended_action"] in (
             "no_action_needed", "merge_blank_rows_into_previous"
         ) else f"  <-- {report['recommended_action'].upper()}"

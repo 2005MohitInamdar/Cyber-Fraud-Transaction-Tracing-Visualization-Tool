@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException, Request, status, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
+from starlette.concurrency import run_in_threadpool
 from services.auth import login, signup, get_current_user
 from services.fileupload.upload import FileUploadMetadata, initiate_upload, receive_chunk
 from services.caseLeadData.lead import CaseLeadOfficer, receive_lead_data
+from services.dashboard import get_dashboard_summary, get_user_cases
+from services.upload_progress import get_events_for_user, publish
 
 # ─── Cookie config (single source of truth) ──────────────────────────────────
 _COOKIE_NAME    = "access_token"
@@ -125,6 +128,46 @@ def logout(response: Response):
     return {"message": "Logged out successfully."}
 
 
+# ─── Dashboard Routes ────────────────────────────────────────────────────────
+
+@app.get("/api/dashboard/summary", status_code=status.HTTP_200_OK)
+def dashboard_summary(request: Request):
+    """Return per-user, distinct-upload counts for the dashboard."""
+    access_token = request.cookies.get(_COOKIE_NAME)
+    try:
+        user_id = get_current_user(access_token)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+
+    try:
+        return get_dashboard_summary(user_id)
+    except Exception as e:
+        print(f"[DASHBOARD ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load dashboard data. Please try again.",
+        )
+
+
+@app.get("/api/dashboard/cases", status_code=status.HTTP_200_OK)
+def dashboard_cases(request: Request):
+    """Return case cards belonging only to the authenticated user."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+        return {"cases": get_user_cases(user_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except Exception as e:
+        print(f"[DASHBOARD CASES ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load cases. Please try again.",
+        )
+
+
 # ─── Upload Routes ───────────────────────────────────────────────────────────
 
 @app.post("/api/uploads/initiate", status_code=status.HTTP_201_CREATED)
@@ -174,6 +217,8 @@ def initiate_upload_route(request: Request, body: InitiateUploadRequest):
             detail="Failed to save file metadata. Please try again.",
         )
 
+    publish(body.fileMetadata.uploadId, "Case created. Preparing secure upload.")
+
     # ── 4. Acknowledge upload initiation ────────────────────────────────────
     return {
         "message": "upload complete",
@@ -181,6 +226,18 @@ def initiate_upload_route(request: Request, body: InitiateUploadRequest):
         "caseRowId": db_result.get("rowId"),
         "sessionRowId": upload_result.get("sessionRowId"),
     }
+
+
+@app.get("/api/uploads/{upload_id}/progress", status_code=status.HTTP_200_OK)
+def upload_progress(request: Request, upload_id: str):
+    """Return user-owned processing events for one upload."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+        return {"events": get_events_for_user(upload_id, user_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 # ─── Chunk Upload Route ───────────────────────────────────────────────────────
@@ -218,7 +275,11 @@ async def upload_chunk_route(
 
     # ── 3. Verify & print chunk metadata ─────────────────────────────────────
     try:
-        result = receive_chunk(
+        # File assembly, PDF parsing, and MySQL writes are synchronous and can
+        # take time. Keep them off the async event loop so the frontend can
+        # continue polling /progress while this final chunk is processed.
+        result = await run_in_threadpool(
+            receive_chunk,
             request,
             upload_id=uploadId,
             user_id=user_id,

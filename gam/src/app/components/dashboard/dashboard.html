@@ -41,6 +41,8 @@
   <!-- Stats Section -->
   <div class="stats-section">
     <h3 class="stats-heading">Overview</h3>
+    <p *ngIf="isLoading()" class="stats-heading">Loading your case summary…</p>
+    <p *ngIf="loadError()" class="stats-heading">Unable to load your case summary.</p>
     <div class="stats-grid">
 
       <!-- Total Fraud Cases -->
@@ -53,7 +55,7 @@
           </svg>
         </div>
         <div class="stat-body">
-          <span class="stat-number">{{ totalFraudCases }}</span>
+          <span class="stat-number">{{ totalFraudCases() }}</span>
           <span class="stat-label">Total Fraud Cases</span>
         </div>
       </div>
@@ -68,8 +70,8 @@
           </svg>
         </div>
         <div class="stat-body">
-          <span class="stat-number">{{ casesMissingData }}</span>
-          <span class="stat-label">Cases with Missing Data</span>
+          <span class="stat-number">{{ uploadsInProgress() }}</span>
+          <span class="stat-label">Uploads in Progress</span>
         </div>
       </div>
 
@@ -82,8 +84,8 @@
           </svg>
         </div>
         <div class="stat-body">
-          <span class="stat-number">{{ casesCompletedTransactions }}</span>
-          <span class="stat-label">Completed Transaction Details</span>
+          <span class="stat-number">{{ completedUploads() }}</span>
+          <span class="stat-label">Completed Uploads</span>
         </div>
       </div>
 
@@ -98,13 +100,25 @@
           </svg>
         </div>
         <div class="stat-body">
-          <span class="stat-number">{{ casesIncompleteNodes }}</span>
-          <span class="stat-label">Cases with Incomplete Nodes</span>
+          <span class="stat-number">{{ failedUploads() }}</span>
+          <span class="stat-label">Failed Uploads</span>
         </div>
       </div>
 
     </div>
   </div>
+
+  <section class="case-list-section">
+    <h3 class="stats-heading">Your cases</h3>
+    <p *ngIf="!isLoading() && !cases().length" class="empty-cases">No fraud cases yet. Start one above to see it here.</p>
+    <div class="case-list">
+      <article class="case-card" *ngFor="let case of cases()">
+        <span class="case-card-label">Fraud case</span>
+        <h4>{{ case.inspectorName }}</h4>
+        <p>Created {{ case.createdAt | date:'medium' }}</p>
+      </article>
+    </div>
+  </section>
 </main>
 
 <!-- New Fraud Case Modal -->

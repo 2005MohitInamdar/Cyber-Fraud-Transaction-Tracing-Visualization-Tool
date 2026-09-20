@@ -37,6 +37,7 @@ from fastapi import Request
 from db.connection import get_connection, get_redis
 from services.pdf_extraction.extractor import extract_tables
 from services.pdf_extraction.wrapper import run_pipeline
+from services.upload_progress import publish
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 
@@ -334,6 +335,8 @@ def receive_chunk(
         print(f"  fileSize : {session_meta.fileSize:,} bytes")
         print(f"{'═' * 60}\n")
 
+        publish(upload_id, "Upload complete. Assembling the case file.")
+
         finalise_result = _assemble_and_finalise(
             request,
             upload_id=upload_id,
@@ -416,6 +419,7 @@ def _assemble_and_finalise(
             print(f"      ✔  Appended chunk {chunk_num}")
 
     print(f"  ✅  File assembled successfully: {out_path}")
+    publish(upload_id, "File assembled. Starting document analysis.")
 
     # ── 2. Clean up temp directory ────────────────────────────────────────────
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -482,13 +486,25 @@ def _assemble_and_finalise(
                 "extractionStatus": "failed",
                 "extractionError":  str(exc),
             }
+            publish(upload_id, "Processing failed. Please review the upload and try again.", "failed")
     else:
         print(f"  Skipping PDF extraction — file is not a PDF ({file_name})")
         extraction_result = {"extractionStatus": "skipped"}
+        publish(upload_id, "File uploaded successfully. Extraction is available for PDF files only.", "complete")
+
+    # This is the frontend completion contract. It is emitted only after the
+    # entire finalisation path has finished successfully (or intentionally
+    # skipped extraction for a non-PDF upload).
+    completion_keyword = (
+        "CASE_PROCESSING_COMPLETE"
+        if extraction_result.get("extractionStatus") in ("complete", "skipped")
+        else None
+    )
 
     return {
         "finalised":    True,
         "filePath":     relative_file_path,
         "mysqlSession": session_row,
+        "completionKeyword": completion_keyword,
         **extraction_result,
     }

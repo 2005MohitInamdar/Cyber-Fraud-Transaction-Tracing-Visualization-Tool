@@ -220,3 +220,44 @@
 }
 .stat-incomplete .stat-number { color: #f87171; }
 
+/* ===== User Case Cards ===== */
+.case-list-section {
+  width: 100%;
+  margin-top: 2.5rem;
+}
+
+.case-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.case-card {
+  min-height: 120px;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid rgba(129, 140, 248, 0.22);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e293b, #172235);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.24);
+}
+
+.case-card-label {
+  color: #818cf8;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.case-card h4 {
+  margin: 0.75rem 0 0.35rem;
+  color: #e2e8f0;
+  font-size: 1rem;
+}
+
+.case-card p,
+.empty-cases {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}

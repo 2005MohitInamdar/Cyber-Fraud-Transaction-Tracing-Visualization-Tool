@@ -1133,7 +1133,7 @@ def _id_source(schema):
 
 # ── Directory orchestration ─────────────────────────────────────────────────────
 
-def map_directory(input_dir, output_dir=None) -> dict:
+def map_directory(input_dir, output_dir=None, progress=None) -> dict:
     input_dir = Path(input_dir)
     if not input_dir.is_dir():
         raise NotADirectoryError(f"Not a directory: {input_dir}")
@@ -1159,6 +1159,8 @@ def map_directory(input_dir, output_dir=None) -> dict:
 
         report = result["_schema_mapping"]
         written[result["table"]] = out_path
+        if progress:
+            progress(f"Mapped {result['table'].replace('_', ' ')} to the database schema.")
         flag = "" if report["status"] == "ok" else f"  <-- {report['status'].upper()}"
         if report["kind"] == "rows":
             print(f"  [schema_map] {result['table']:<24} "

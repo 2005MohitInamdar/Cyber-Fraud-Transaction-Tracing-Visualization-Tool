@@ -149,8 +149,12 @@ from .extractor import extract_tables
 from .normalization import normalize_directory
 from .correct_columns import map_directory
 from .commit_to_db import load_all
+from ..upload_progress import publish
 
 def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> dict:
+    def progress(message: str, state: str = "processing") -> None:
+        publish(upload_id, message, state)
+
     pdf_path = Path(pdf_path)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
@@ -165,14 +169,16 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
 
     print("=" * 64)
     print("STAGE 1/3 - extraction")
+    progress("Extracting text and tables from the PDF.")
     print("=" * 64)
-    extracted = extract_tables(pdf_path, raw_dir)
+    extracted = extract_tables(pdf_path, raw_dir, progress=progress)
     print(f"\nExtracted {len(extracted)} table(s) -> {raw_dir}")
 
     print("\n" + "=" * 64)
     print("STAGE 2/3 - normalization")
+    progress("Cleaning and normalizing extracted data.")
     print("=" * 64)
-    normalized = normalize_directory(raw_dir, normalized_dir)
+    normalized = normalize_directory(raw_dir, normalized_dir, progress=progress)
     print(f"\nNormalized {len(normalized)} table(s) -> {normalized_dir}")
 
     # Snapshot the normalization report before stage 3 overwrites these
@@ -182,8 +188,9 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
 
     print("\n" + "=" * 64)
     print("STAGE 3/3 - schema mapping (MySQL column names/types)")
+    progress("Mapping extracted fields to the database schema.")
     print("=" * 64)
-    mapped = map_directory(normalized_dir, db_schema_dir)
+    mapped = map_directory(normalized_dir, db_schema_dir, progress=progress)
     print(f"\nMapped {len(mapped)} table(s) -> {db_schema_dir}")
 
     review_flags = _collect_review_flags(db_schema_dir)
@@ -204,10 +211,22 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
         print("\nNo escalations or flags - every table mapped cleanly, ready to load.")
 
     print("Pushing to database")
+    progress("Saving extracted case data to the database.")
 
     # The request was authenticated before chunk handling. Keep both IDs
     # explicit so all extracted records are linked to the exact case upload.
-    load_results = load_all(user_id, upload_id, db_schema_dir)
+    load_results = load_all(user_id, upload_id, db_schema_dir, progress=progress)
+    failed_tables = [
+        table for table, result in load_results.items()
+        if isinstance(result, str) and result.startswith("FAILED:")
+    ]
+    if failed_tables:
+        progress(
+            "Processing finished with database errors: " + ", ".join(failed_tables) + ".",
+            "failed",
+        )
+    else:
+        progress("Case processing completed successfully.", "complete")
 
     return {
         "raw_dir": raw_dir,

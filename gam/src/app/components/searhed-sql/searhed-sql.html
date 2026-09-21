@@ -1,0 +1,40 @@
+<section class="case-search" aria-label="Search case details">
+  <form class="search-form" (ngSubmit)="search()">
+    <input
+      type="search"
+      [ngModel]="searchQuery()"
+      (ngModelChange)="searchQuery.set($event)"
+      name="caseSearchQuery"
+      placeholder="Ask about this case, for example: transactions over 10000"
+      [disabled]="isSearching()"
+    />
+    <button type="submit" [disabled]="isSearching() || !searchQuery().trim()">
+      {{ isSearching() ? 'Searching…' : 'Search' }}
+    </button>
+  </form>
+
+  <div class="search-tabs" role="tablist" aria-label="Case detail views">
+    <button type="button" role="tab" [class.active]="activeTab() === 'all'" (click)="selectTab('all')">
+      All Details
+    </button>
+    <button type="button" role="tab" [class.active]="activeTab() === 'search'" (click)="selectTab('search')">
+      Search Results
+    </button>
+  </div>
+
+  <section *ngIf="activeTab() === 'search'" class="search-results-panel">
+    <p *ngIf="generatedSql()" class="generated-sql-label">Generated SQL</p>
+    <pre *ngIf="generatedSql()"><code>{{ generatedSql() }}</code></pre>
+    <p *ngIf="searchError()" class="search-message search-message--error">{{ searchError() }}</p>
+    <p *ngIf="!searchError() && searchResults()?.length === 0" class="search-message">No results for this query.</p>
+    <p *ngIf="!searchError() && searchResults() === null" class="search-message">Enter a query to search this case.</p>
+    <div class="table-wrap" *ngIf="!searchError() && searchResults()?.length">
+      <table>
+        <thead><tr><th *ngFor="let key of keys(searchResults()![0])">{{ key }}</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let row of searchResults()"><td *ngFor="let key of keys(searchResults()![0])">{{ row[key] ?? '—' }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

@@ -33,6 +33,11 @@ export interface CaseDetail {
     pendingTransactions: Record<string, unknown>[];
   };
 }
+
+export interface CaseSearchResult {
+  sql: string;
+  rows: Record<string, unknown>[];
+}
 @Injectable({
   providedIn: 'root',
 })
@@ -41,5 +46,19 @@ export class Case_Details {
   
     getCaseDetail(uploadId: string): Observable<CaseDetail> {
       return this.http.get<CaseDetail>(`${environment.apiBaseUrl}/api/cases/${uploadId}`);
+    }
+
+    sendReportEmail(uploadId: string): Observable<{ message: string; subject: string }> {
+      return this.http.post<{ message: string; subject: string }>(
+        `${environment.apiBaseUrl}/api/cases/${uploadId}/report-email`,
+        {},
+      );
+    }
+
+    searchCase(uploadId: string, query: string): Observable<CaseSearchResult> {
+      return this.http.post<CaseSearchResult>(
+        `${environment.apiBaseUrl}/api/cases/${uploadId}/search`,
+        { query },
+      );
     }
 }

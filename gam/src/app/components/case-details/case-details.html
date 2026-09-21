@@ -18,36 +18,59 @@
       </div>
     </header>
 
-    <section class="data-section" *ngIf="hasValues(detail.tables.complaintMeta)">
-      <h2>Complaint metadata</h2>
-      <dl class="metadata-list">
-        <ng-container *ngFor="let key of keys(detail.tables.complaintMeta)">
-          <dt>{{ key }}</dt><dd>{{ detail.tables.complaintMeta[key] ?? '—' }}</dd>
-        </ng-container>
-      </dl>
-    </section>
+    <div class="report-email-action">
+      <button
+        class="send-report-btn"
+        (click)="sendReportEmail()"
+        [disabled]="isSendingReport()"
+      >
+        {{ isSendingReport() ? 'Sending…' : 'Generate & Send Report Email' }}
+      </button>
+      <p *ngIf="reportSendResult() === 'success'" class="report-status report-status--success">
+        Report email sent.
+      </p>
+      <p *ngIf="reportSendResult() === 'error'" class="report-status report-status--error">
+        {{ reportErrorMessage() }}
+      </p>
+    </div>
 
-    <ng-container *ngFor="let table of [
-      { title: 'Amount summary', rows: detail.tables.amountSummary },
-      { title: 'Complaint transactions', rows: detail.tables.complaintTransactions },
-      { title: 'Failed transactions', rows: detail.tables.failedTransactions },
-      { title: 'Hold accounts', rows: detail.tables.holdAccounts },
-      { title: 'Lien transactions', rows: detail.tables.lienTransactions },
-      { title: 'No-action references', rows: detail.tables.noActionReferences },
-      { title: 'Pending transactions', rows: detail.tables.pendingTransactions }
-    ]">
-      <section class="data-section">
-        <h2>{{ table.title }}</h2>
-        <p class="no-records" *ngIf="!table.rows.length">No records.</p>
-        <div class="table-wrap" *ngIf="table.rows.length">
-          <table>
-            <thead><tr><th *ngFor="let key of keys(table.rows[0])">{{ key }}</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let row of table.rows"><td *ngFor="let key of keys(table.rows[0])">{{ row[key] ?? '—' }}</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <app-searhed-sql
+      [uploadId]="detail.uploadId"
+      (activeTabChange)="setActiveTab($event)"
+    />
+
+    <ng-container *ngIf="activeTab() === 'all'">
+      <section class="data-section" *ngIf="hasValues(detail.tables.complaintMeta)">
+        <h2>Complaint metadata</h2>
+        <dl class="metadata-list">
+          <ng-container *ngFor="let key of keys(detail.tables.complaintMeta)">
+            <dt>{{ key }}</dt><dd>{{ detail.tables.complaintMeta[key] ?? '—' }}</dd>
+          </ng-container>
+        </dl>
       </section>
+
+      <ng-container *ngFor="let table of [
+        { title: 'Amount summary', rows: detail.tables.amountSummary },
+        { title: 'Complaint transactions', rows: detail.tables.complaintTransactions },
+        { title: 'Failed transactions', rows: detail.tables.failedTransactions },
+        { title: 'Hold accounts', rows: detail.tables.holdAccounts },
+        { title: 'Lien transactions', rows: detail.tables.lienTransactions },
+        { title: 'No-action references', rows: detail.tables.noActionReferences },
+        { title: 'Pending transactions', rows: detail.tables.pendingTransactions }
+      ]">
+        <section class="data-section">
+          <h2>{{ table.title }}</h2>
+          <p class="no-records" *ngIf="!table.rows.length">No records.</p>
+          <div class="table-wrap" *ngIf="table.rows.length">
+            <table>
+              <thead><tr><th *ngFor="let key of keys(table.rows[0])">{{ key }}</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let row of table.rows"><td *ngFor="let key of keys(table.rows[0])">{{ row[key] ?? '—' }}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
     </ng-container>
   </ng-container>
 </main>

@@ -8,6 +8,8 @@ from services.caseLeadData.lead import CaseLeadOfficer, receive_lead_data
 from services.dashboard import get_dashboard_summary, get_user_cases
 from services.upload_progress import get_events_for_user, publish
 from services.caseDetail.detail import get_case_detail
+from services.caseReport.report_email import generate_report_email, send_report_email
+from services.caseSearch.sql_search import SearchExecutionError, UnsafeQueryError, run_case_search
 
 # ─── Cookie config (single source of truth) ──────────────────────────────────
 _COOKIE_NAME    = "access_token"
@@ -17,6 +19,12 @@ _COOKIE_MAX_AGE = 60 * 60 * 24   # 1 day
 class InitiateUploadRequest(BaseModel):
     leadOfficer: CaseLeadOfficer
     fileMetadata: FileUploadMetadata
+
+
+class CaseSearchRequest(BaseModel):
+    query: str
+
+
 app = FastAPI()
 
 app.add_middleware(
@@ -256,6 +264,82 @@ def case_detail(request: Request, upload_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load case detail. Please try again.",
+        )
+
+
+@app.post("/api/cases/{upload_id}/report-email", status_code=status.HTTP_200_OK)
+def send_case_report_email(request: Request, upload_id: str):
+    """Generate and deliver an internal report for one user-owned case."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    try:
+        case_data = get_case_detail(user_id, upload_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        print(f"[CASE REPORT DETAIL ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load case data for the report.",
+        )
+
+    try:
+        email_content = generate_report_email(case_data)
+    except Exception as e:
+        print(f"[CASE REPORT GENERATION ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to generate report email: {e}",
+        )
+
+    try:
+        send_report_email(email_content["subject"], email_content["body"])
+    except Exception as e:
+        print(f"[CASE REPORT DELIVERY ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to send report email: {e}",
+        )
+
+    return {"message": "Report email sent", "subject": email_content["subject"]}
+
+
+@app.post("/api/cases/{upload_id}/search", status_code=status.HTTP_200_OK)
+def search_case(request: Request, upload_id: str, body: CaseSearchRequest):
+    """Run a validated natural-language search against one owned case."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    if not body.query or not body.query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Query cannot be empty.",
+        )
+
+    try:
+        return run_case_search(body.query.strip(), upload_id, user_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except UnsafeQueryError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": str(e), "sql": e.sql},
+        )
+    except SearchExecutionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": str(e), "sql": e.sql},
+        )
+    except Exception as e:
+        print(f"[CASE SEARCH ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Search could not be completed. Please try again.",
         )
 
 

@@ -23,7 +23,7 @@ Redis key structure
 Disk layout
 -----------
   uploads/.tmp/{upload_id}/{chunk_number}.bin  ← temp part files
-  uploads/{upload_id}_{file_name}              ← final assembled file
+  uploads/{upload_id}.pdf|.bin                 ← final assembled file
 """
 
 import hashlib
@@ -31,15 +31,19 @@ import json
 import os
 import pathlib
 import shutil
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import List
 from fastapi import Request
 from db.connection import get_connection, get_redis
 from services.pdf_extraction.extractor import extract_tables
 from services.pdf_extraction.wrapper import run_pipeline
 from services.upload_progress import publish
+from .paths import parse_upload_id, clean_display_name, safe_join
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
+
+MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024
+MAX_TOTAL_CHUNKS = 1000
 
 class ChunkMetadata(BaseModel):
     chunkNumber: int
@@ -49,15 +53,24 @@ class ChunkMetadata(BaseModel):
 
 class FileUploadMetadata(BaseModel):
     uploadId: str
-    fileName: str
-    fileSize: int
+    fileName: str = Field(min_length=1, max_length=500)
+    fileSize: int = Field(gt=0, le=MAX_FILE_SIZE_BYTES)
     contentType: str
     chunkSize: int
-    totalChunks: int
+    totalChunks: int = Field(gt=0, le=MAX_TOTAL_CHUNKS)
     fileHash: str
     status: str
     chunks: List[ChunkMetadata]
 
+    @field_validator("uploadId")
+    @classmethod
+    def _check_upload_id(cls, v: str) -> str:
+        return parse_upload_id(v)          # ValueError becomes a 422 automatically
+
+    @field_validator("fileName")
+    @classmethod
+    def _check_file_name(cls, v: str) -> str:
+        return clean_display_name(v)
 
 # ─── Redis key helper ─────────────────────────────────────────────────────────
 
@@ -96,6 +109,12 @@ _UPDATE_SESSION = """
         received_chunks  = %s,
         status           = %s,
         file_path        = %s
+    WHERE upload_id = %s
+"""
+
+_MARK_FAILED = """
+    UPDATE file_upload_sessions
+    SET status = 'failed'
     WHERE upload_id = %s
 """
 
@@ -231,6 +250,8 @@ def receive_chunk(
     ValueError – if the SHA-256 hash of the received bytes doesn't match
     """
 
+    upload_id = parse_upload_id(upload_id)
+
     # ── 1. Confirm this authenticated user owns the upload ───────────────────
     with get_connection() as conn:
         with conn.cursor(dictionary=True) as cur:
@@ -306,9 +327,9 @@ def receive_chunk(
     r.expire(received_key, CHUNK_TTL_SECONDS)          # keep TTL in sync
 
     # Persist raw chunk bytes to disk so we can assemble later
-    tmp_dir = CHUNKS_TMP_DIR / upload_id
+    tmp_dir = safe_join(CHUNKS_TMP_DIR, upload_id)
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    chunk_file = tmp_dir / f"{chunk_number}.bin"
+    chunk_file = tmp_dir / f"{int(chunk_number)}.bin"
     chunk_file.write_bytes(chunk_bytes)
     print(f"  📝  Saved chunk {chunk_number} bytes to temp file: {chunk_file}")
 
@@ -373,7 +394,7 @@ def _assemble_and_finalise(
     Steps
     -----
     1. Read each temp part file (uploads/.tmp/{upload_id}/{n}.bin) in order.
-    2. Write them sequentially into uploads/{upload_id}_{file_name}.
+    2. Write them sequentially into an upload-ID-only filename.
     3. Delete the temp directory for this upload.
     4. UPDATE file_upload_sessions in MySQL:
            total_chunks    = total_chunks
@@ -385,7 +406,7 @@ def _assemble_and_finalise(
     Parameters
     ----------
     upload_id    : str – UUID of the upload session
-    file_name    : str – original file name (used in the output filename)
+    file_name    : str – sanitized display name (used only to select extension)
     total_chunks : int – expected number of chunks (for validation)
 
     Returns
@@ -395,15 +416,12 @@ def _assemble_and_finalise(
 
     # ── 1. Assemble temp parts into final file ────────────────────────────────
 
+    upload_id = parse_upload_id(upload_id)
+    file_name = clean_display_name(file_name)
     print("\n\n", request , "\n\n")
-    tmp_dir = CHUNKS_TMP_DIR / upload_id
-
-    # Normalise filename: replace spaces with underscores so downstream tools
-    # (pdfplumber, etc.) don't have issues with spaces in Windows paths.
-    safe_file_name = file_name.replace(" ", "_")
-
-    out_name = f"{upload_id}_{safe_file_name}"
-    out_path = UPLOADS_DIR / out_name
+    tmp_dir = safe_join(CHUNKS_TMP_DIR, upload_id)
+    ext = ".pdf" if file_name.lower().endswith(".pdf") else ".bin"
+    out_path = safe_join(UPLOADS_DIR, f"{upload_id}{ext}")
 
     print(f"  🔧  Assembling {total_chunks} chunk(s) → {out_path}")
 
@@ -424,6 +442,16 @@ def _assemble_and_finalise(
     # ── 2. Clean up temp directory ────────────────────────────────────────────
     shutil.rmtree(tmp_dir, ignore_errors=True)
     print(f"  Removed temp directory: {tmp_dir}")
+
+    with out_path.open("rb") as assembled_file:
+        pdf_signature = assembled_file.read(5)
+    if ext == ".pdf" and pdf_signature != b"%PDF-":
+        out_path.unlink(missing_ok=True)
+        publish(upload_id, "The uploaded file is not a valid PDF.", "failed")
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(_MARK_FAILED, (upload_id,))
+        raise ValueError("Uploaded file is not a valid PDF.")
 
     # ── 3. UPDATE MySQL file_upload_sessions ──────────────────────────────────
     received_chunks_json = json.dumps(list(range(1, total_chunks + 1)))
@@ -456,8 +484,8 @@ def _assemble_and_finalise(
     # under uploads/extracted/<upload_id>/ to avoid collisions between
     # concurrent uploads.
     extraction_result: dict = {}
-    if safe_file_name.lower().endswith(".pdf"):
-        extracted_dir = UPLOADS_DIR / "extracted" / upload_id
+    if ext == ".pdf":
+        extracted_dir = safe_join(UPLOADS_DIR, "extracted", upload_id)
         extracted_dir.mkdir(parents=True, exist_ok=True)
         try:
             print(f"\n  Starting PDF extraction for upload_id='{upload_id}'...")

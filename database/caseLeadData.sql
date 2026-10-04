@@ -1,3 +1,159 @@
+
+drop database gam_db;
+create database if not exists gam_db;
+use gam_db;
+
+
+
+
+ALTER TABLE cases
+  ADD COLUMN supabase_user_id VARCHAR(64) NOT NULL AFTER id,
+  ADD COLUMN upload_id        VARCHAR(64) NOT NULL AFTER supabase_user_id,
+  ADD COLUMN report_extras    JSON NULL,
+  MODIFY ack_no VARCHAR(32) NULL,
+  DROP INDEX uq_cases_ack,
+  ADD UNIQUE KEY uq_cases_upload (upload_id),
+  ADD KEY idx_cases_user_ack (supabase_user_id, ack_no);
+  
+  
+CREATE TABLE cases (
+  id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ack_no                VARCHAR(32)   NOT NULL,
+  status                VARCHAR(64)   NULL,
+  base_debit_total      DECIMAL(14,2) NULL,
+  reported_fraud_total  DECIMAL(14,2) NULL,
+  hold_total            DECIMAL(14,2) NULL,
+  reported_lien_total   DECIMAL(14,2) NULL,
+  holds_match_lien      TINYINT(1)    NULL,
+  checks                JSON          NULL,   -- the full "checks" object
+  raw_flow              JSON          NULL,   -- full transaction_flow.json (audit)
+  created_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_cases_ack (ack_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE nodes (
+  case_id            BIGINT UNSIGNED NOT NULL,
+  node_id            VARCHAR(64)   NOT NULL,           -- e.g. node:776d500dfffdca5e
+  layer              TINYINT UNSIGNED NOT NULL,        -- 0 = victim debit
+  bank               VARCHAR(255)  NULL,               -- receiving bank
+  action_taken_by    VARCHAR(255)  NULL,
+  account_no         VARCHAR(64)   NULL,
+  utr                VARCHAR(32)   NULL,
+  tx_amount          DECIMAL(14,2) NULL,
+  disputed_amount    DECIMAL(14,2) NULL,
+  amount_estimated   TINYINT(1)    NOT NULL DEFAULT 0, -- disputed amount was missing
+  frozen_amount      DECIMAL(14,2) NOT NULL DEFAULT 0,
+  unaccounted_amount DECIMAL(14,2) NULL,
+  embedded_ids       JSON          NULL,
+  root_ids           JSON          NULL,
+  source_row_ids     JSON          NULL,
+  remarks            TEXT          NULL,
+  PRIMARY KEY (case_id, node_id),
+  KEY idx_nodes_layer   (case_id, layer),
+  KEY idx_nodes_account (account_no),
+  KEY idx_nodes_utr     (utr),
+  CONSTRAINT fk_nodes_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE edges (
+  id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  case_id          BIGINT UNSIGNED NOT NULL,
+  from_node        VARCHAR(64)   NOT NULL,
+  to_node          VARCHAR(64)   NOT NULL,
+  match_rule       VARCHAR(48)   NOT NULL,
+  confidence       DECIMAL(3,2)  NOT NULL,
+  amount_passed    DECIMAL(14,2) NULL,
+  ambiguous        TINYINT(1)    NOT NULL DEFAULT 0,
+  merged           TINYINT(1)    NOT NULL DEFAULT 0,
+  amount_estimated TINYINT(1)    NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_edge (case_id, from_node, to_node),
+  KEY idx_edges_to (case_id, to_node),
+  CONSTRAINT fk_edges_from FOREIGN KEY (case_id, from_node) REFERENCES nodes(case_id, node_id) ON DELETE CASCADE,
+  CONSTRAINT fk_edges_to   FOREIGN KEY (case_id, to_node)   REFERENCES nodes(case_id, node_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE holds (
+  case_id         BIGINT UNSIGNED NOT NULL,
+  hold_id         VARCHAR(64)   NOT NULL,              -- e.g. hold:51ed214c2403ebe2
+  account_no      VARCHAR(64)   NULL,
+  hold_amount     DECIMAL(14,2) NULL,
+  hold_date       DATE          NULL,
+  action_taken_by VARCHAR(255)  NULL,
+  embedded_ids    JSON          NULL,
+  source_row_ids  JSON          NULL,
+  remarks         TEXT          NULL,
+  PRIMARY KEY (case_id, hold_id),
+  KEY idx_holds_account (account_no),
+  CONSTRAINT fk_holds_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE hold_links (
+  case_id    BIGINT UNSIGNED NOT NULL,
+  hold_id    VARCHAR(64)   NOT NULL,
+  node_id    VARCHAR(64)   NOT NULL,
+  match_rule VARCHAR(48)   NOT NULL,
+  confidence DECIMAL(3,2)  NOT NULL,
+  amount     DECIMAL(14,2) NULL,
+  PRIMARY KEY (case_id, hold_id),
+  KEY idx_hold_links_node (case_id, node_id),
+  CONSTRAINT fk_hl_hold FOREIGN KEY (case_id, hold_id) REFERENCES holds(case_id, hold_id) ON DELETE CASCADE,
+  CONSTRAINT fk_hl_node FOREIGN KEY (case_id, node_id) REFERENCES nodes(case_id, node_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE rejected_candidates (
+  id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  case_id   BIGINT UNSIGNED NOT NULL,
+  from_node VARCHAR(64) NOT NULL,
+  to_node   VARCHAR(64) NOT NULL,
+  reason    VARCHAR(128) NOT NULL,
+  KEY idx_rejected_case (case_id),
+  CONSTRAINT fk_rej_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- The "no flow" lists are derived, so they can never go stale.
+CREATE VIEW v_unlinked_rows AS      -- trail rows with no parent
+SELECT n.* FROM nodes n
+WHERE n.layer > 0
+  AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.case_id = n.case_id AND e.to_node = n.node_id);
+
+CREATE VIEW v_end_of_trail AS       -- has a parent, passes nothing on
+SELECT n.* FROM nodes n
+WHERE n.layer > 0
+  AND EXISTS     (SELECT 1 FROM edges e WHERE e.case_id = n.case_id AND e.to_node   = n.node_id)
+  AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.case_id = n.case_id AND e.from_node = n.node_id);
+
+CREATE VIEW v_untraced_base AS      -- victim debits that matched nothing
+SELECT n.* FROM nodes n
+WHERE n.layer = 0
+  AND NOT EXISTS (SELECT 1 FROM edges e WHERE e.case_id = n.case_id AND e.from_node = n.node_id);
+
+CREATE VIEW v_no_flow AS            -- no parent, no child, no hold
+SELECT n.* FROM nodes n
+WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.case_id = n.case_id AND (e.from_node = n.node_id OR e.to_node = n.node_id))
+  AND NOT EXISTS (SELECT 1 FROM hold_links h WHERE h.case_id = n.case_id AND h.node_id = n.node_id);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 -- ============================================================
 -- gam_db schema
 -- ============================================================
@@ -60,253 +216,7 @@ CREATE TABLE IF NOT EXISTS file_upload_sessions (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
--- ------------------------------------------------------------
--- amount_summary
--- ------------------------------------------------------------
 
-alter table amount_summary add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-alter table amount_summary drop primary key;
-alter table amount_summary add column amount_summary_id int primary key auto_increment;
-desc amount_summary;
-ALTER TABLE amount_summary
-    MODIFY description VARCHAR(255),
-    MODIFY amount DECIMAL(12,2);
-    
-CREATE TABLE IF NOT EXISTS amount_summary (
-    s_no              INT NOT NULL,
-    description       VARCHAR(255) NOT NULL,
-    amount            DECIMAL(12,2) NOT NULL,
-    supabase_user_id  CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-
-
--- ------------------------------------------------------------
--- complaint_meta
--- ------------------------------------------------------------
-alter table complaint_meta add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE complaint_meta MODIFY id INT NOT NULL;
-alter table complaint_meta drop primary key;
-alter table complaint_meta add column complaint_meta_id int primary key auto_increment;
-desc complaint_meta;
-ALTER TABLE complaint_meta
-    modify complaint_accepted_by     VARCHAR(255) DEFAULT NULL,
-    modify complaint_accepted_date   DATETIME DEFAULT NULL,
-    modify current_status            VARCHAR(100) DEFAULT NULL,
-    modify under_process_date        DATETIME DEFAULT NULL;
-    
-
-CREATE TABLE IF NOT EXISTS complaint_meta (
-    id                        INT NOT NULL AUTO_INCREMENT,
-    complaint_accepted_by     VARCHAR(255) DEFAULT NULL,
-    complaint_accepted_date   DATETIME DEFAULT NULL,
-    current_status            VARCHAR(100) DEFAULT NULL,
-    under_process_date        DATETIME DEFAULT NULL,
-    supabase_user_id          CHAR(36) NOT NULL,
-    PRIMARY KEY (id),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
-
-
--- ------------------------------------------------------------
--- complaint_transactions
--- ------------------------------------------------------------
-
-alter table complaint_transactions add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE complaint_transactions MODIFY id INT NOT NULL;
-alter table complaint_transactions drop primary key;
-alter table complaint_transactions add column complaint_transactions_id int primary key auto_increment;
-desc complaint_transactions;
-ALTER TABLE complaint_transactions
-	modify account_wallet_id      VARCHAR(255) DEFAULT NULL,
-    modify transaction_id         VARCHAR(50) DEFAULT NULL,
-    modify card_details           VARCHAR(255) DEFAULT NULL,
-    modify transaction_amount     DECIMAL(12,2) DEFAULT NULL,
-    modify reference_no           VARCHAR(100) DEFAULT NULL,
-    modify transaction_datetime   DATETIME DEFAULT NULL,
-    modify complaint_date         DATETIME DEFAULT NULL,
-    modify bank_fi                VARCHAR(100) DEFAULT NULL;
-    
-CREATE TABLE IF NOT EXISTS complaint_transactions (
-    s_no                   INT NOT NULL,
-    account_wallet_id      VARCHAR(255) DEFAULT NULL,
-    transaction_id         VARCHAR(50) DEFAULT NULL,
-    card_details           VARCHAR(255) DEFAULT NULL,
-    transaction_amount     DECIMAL(12,2) DEFAULT NULL,
-    reference_no           VARCHAR(100) DEFAULT NULL,
-    transaction_datetime   DATETIME DEFAULT NULL,
-    complaint_date         DATETIME DEFAULT NULL,
-    bank_fi                VARCHAR(100) DEFAULT NULL,
-    supabase_user_id       CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- failed_transactions
--- ------------------------------------------------------------
-
-alter table failed_transactions add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE failed_transactions MODIFY s_no INT NOT NULL;
-alter table failed_transactions drop primary key;
-alter table failed_transactions add column failed_transactions_id int primary key auto_increment;
-desc failed_transactions;
-ALTER TABLE failed_transactions
-    modify account_no          VARCHAR(255) DEFAULT NULL,
-    modify transaction_date    DATE DEFAULT NULL,
-    modify transaction_amount  DECIMAL(12,2) DEFAULT NULL,
-    modify reference_remarks   VARCHAR(255) DEFAULT NULL,
-    modify action_taken_by     VARCHAR(100) DEFAULT NULL,
-    modify date_of_action      DATETIME DEFAULT NULL;
-CREATE TABLE IF NOT EXISTS failed_transactions (
-    s_no                INT NOT NULL,
-    account_no          VARCHAR(255) DEFAULT NULL,
-    transaction_date    DATE DEFAULT NULL,
-    transaction_amount  DECIMAL(12,2) DEFAULT NULL,
-    reference_remarks   VARCHAR(255) DEFAULT NULL,
-    action_taken_by     VARCHAR(100) DEFAULT NULL,
-    date_of_action      DATETIME DEFAULT NULL,
-    supabase_user_id    CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- hold_accounts
--- ------------------------------------------------------------
-
-alter table hold_accounts add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE hold_accounts MODIFY s_no INT NOT NULL;
-alter table hold_accounts drop primary key;
-alter table hold_accounts add column hold_accounts_id int primary key auto_increment;
-desc hold_accounts;
-ALTER TABLE hold_accounts
-    modify account_no          VARCHAR(50) DEFAULT NULL,
-    modify hold_date           DATE DEFAULT NULL,
-    modify hold_amount         DECIMAL(12,2) DEFAULT NULL,
-    modify reference_remarks   VARCHAR(255) DEFAULT NULL,
-    modify action_taken_by     VARCHAR(100) DEFAULT NULL,
-    modify date_of_action      DATETIME DEFAULT NULL;
-    
-CREATE TABLE IF NOT EXISTS hold_accounts (
-    s_no                INT NOT NULL,
-    account_no          VARCHAR(50) DEFAULT NULL,
-    hold_date           DATE DEFAULT NULL,
-    hold_amount         DECIMAL(12,2) DEFAULT NULL,
-    reference_remarks   VARCHAR(255) DEFAULT NULL,
-    action_taken_by     VARCHAR(100) DEFAULT NULL,
-    date_of_action      DATETIME DEFAULT NULL,
-    supabase_user_id    CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- lien_transactions
--- ------------------------------------------------------------
-
-alter table lien_transactions add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE lien_transactions MODIFY s_no INT NOT NULL;
-alter table lien_transactions drop primary key;
-alter table lien_transactions add column lien_transactions_id int primary key auto_increment;
-desc lien_transactions;
-ALTER TABLE lien_transactions
-    modify bank_fi                VARCHAR(255) DEFAULT NULL,
-    modify account_no             VARCHAR(50) DEFAULT NULL,
-    modify ifsc_code              VARCHAR(20) DEFAULT NULL,
-    modify layer                  INT DEFAULT NULL,
-    modify transaction_id         VARCHAR(50) DEFAULT NULL,
-    modify transaction_datetime   DATETIME DEFAULT NULL,
-    modify transaction_amount     DECIMAL(12,2) DEFAULT NULL,
-    modify disputed_amount        DECIMAL(12,2) DEFAULT NULL,
-    modify reference_remarks      VARCHAR(500) DEFAULT NULL,
-    modify action_taken_by        VARCHAR(255) DEFAULT NULL,
-    modify date_of_action         DATETIME DEFAULT NULL;
-    
-CREATE TABLE IF NOT EXISTS lien_transactions (
-    s_no                   INT NOT NULL,
-    bank_fi                VARCHAR(255) DEFAULT NULL,
-    account_no             VARCHAR(50) DEFAULT NULL,
-    ifsc_code              VARCHAR(20) DEFAULT NULL,
-    layer                  INT DEFAULT NULL,
-    transaction_id         VARCHAR(50) DEFAULT NULL,
-    transaction_datetime   DATETIME DEFAULT NULL,
-    transaction_amount     DECIMAL(12,2) DEFAULT NULL,
-    disputed_amount        DECIMAL(12,2) DEFAULT NULL,
-    reference_remarks      VARCHAR(500) DEFAULT NULL,
-    action_taken_by        VARCHAR(255) DEFAULT NULL,
-    date_of_action         DATETIME DEFAULT NULL,
-    supabase_user_id       CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no),
-    INDEX idx_supabase_user_id (supabase_user_id)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- no_action_references
--- ------------------------------------------------------------
-
-alter table no_action_references add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE no_action_references MODIFY s_no INT NOT NULL;
-alter table no_action_references drop primary key;
-alter table no_action_references add column no_action_references_id int primary key auto_increment;
-desc no_action_references;
-ALTER TABLE no_action_references
-    modify reference_remarks   VARCHAR(255) DEFAULT NULL,
-    modify action_taken_by     VARCHAR(100) DEFAULT NULL,
-    modify date_of_action      DATETIME DEFAULT NULL;
-    
-CREATE TABLE IF NOT EXISTS no_action_references (
-    s_no                INT NOT NULL,
-    reference_remarks   VARCHAR(255) DEFAULT NULL,
-    action_taken_by     VARCHAR(100) DEFAULT NULL,
-    date_of_action      DATETIME DEFAULT NULL,
-    supabase_user_id    CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- pending_transactions
--- ------------------------------------------------------------
-
-alter table pending_transactions add column upload_id CHAR(36) NOT NULL after supabase_user_id;
-ALTER TABLE pending_transactions MODIFY s_no INT NOT NULL;
-alter table pending_transactions drop primary key;
-alter table pending_transactions add column pending_transactions_id int primary key auto_increment;
-desc pending_transactions;
-ALTER TABLE pending_transactions
-    modify bank                        VARCHAR(100) DEFAULT NULL,
-    modify no_of_transactions_pending  INT DEFAULT NULL,
-    modify amount_pending              DECIMAL(12,2) DEFAULT NULL,
-    modify pending_from                DATETIME DEFAULT NULL;    
-
-CREATE TABLE IF NOT EXISTS pending_transactions (
-    s_no                        INT NOT NULL,
-    bank                        VARCHAR(100) DEFAULT NULL,
-    no_of_transactions_pending  INT DEFAULT NULL,
-    amount_pending              DECIMAL(12,2) DEFAULT NULL,
-    pending_from                DATETIME DEFAULT NULL,
-    supabase_user_id            CHAR(36) NOT NULL,
-    PRIMARY KEY (s_no)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
 
 
 create table if not exists placeholder(
@@ -315,6 +225,3 @@ create table if not exists placeholder(
     upload_id         	CHAR(36)    NOT NULL
 );
 
-SHOW TABLES;
-desc placeholder;
-use gam_db;

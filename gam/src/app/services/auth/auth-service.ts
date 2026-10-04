@@ -3,7 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { map, catchError, tap } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
+// Keep session restoration on the same FastAPI origin as login and every
+// protected API call. The separate Supabase configuration is not an API base.
+import { environment } from '../../environment';
 
 export interface AuthUser {
   userId: string;

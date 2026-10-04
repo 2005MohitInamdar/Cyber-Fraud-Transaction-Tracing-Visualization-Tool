@@ -1,13 +1,14 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
-import { CaseDetail, Case_Details } from '../../services/case_Details/case-details';
+import { CaseDetail, Case_Details, CaseGraph } from '../../services/case_Details/case-details';
 import { SearhedSQL } from '../searhed-sql/searhed-sql';
+import { CaseGraphNew } from '../case-graph-new/case-graph-new'; 
 
 @Component({
   selector: 'app-case-details',
   standalone:true,
-  imports: [CommonModule, RouterLink, SearhedSQL],
+  imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew],
   templateUrl: './case-details.html',
   styleUrl: './case-details.scss',
 })
@@ -19,6 +20,10 @@ export class CaseDetails implements OnInit {
   readonly reportSendResult = signal<'idle' | 'success' | 'error'>('idle');
   readonly reportErrorMessage = signal<string | null>(null);
   readonly activeTab = signal<'all' | 'search'>('all');
+  readonly graph = signal<CaseGraph | null>(null);
+  readonly isGraphLoading = signal(true);
+  readonly graphError = signal(false);
+  readonly showRawTables = signal(false);
 
   private readonly route = inject(ActivatedRoute);
   private readonly caseDetailService = inject(Case_Details);
@@ -40,6 +45,18 @@ export class CaseDetails implements OnInit {
         console.error('Failed to load case detail:', error);
         this.loadError.set(true);
         this.isLoading.set(false);
+      },
+    });
+
+    this.caseDetailService.getCaseGraph(uploadId).subscribe({
+      next: (graph) => {
+        this.graph.set(graph);
+        this.isGraphLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Failed to load transaction graph:', error);
+        this.graphError.set(true);
+        this.isGraphLoading.set(false);
       },
     });
   }
@@ -78,5 +95,9 @@ export class CaseDetails implements OnInit {
 
   setActiveTab(tab: 'all' | 'search'): void {
     this.activeTab.set(tab);
+  }
+
+  toggleRawTables(): void {
+    this.showRawTables.update((shown) => !shown);
   }
 }

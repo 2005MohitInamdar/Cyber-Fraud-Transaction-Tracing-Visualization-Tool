@@ -146,12 +146,12 @@ def cast_int(val):
 
 _AMOUNT_JUNK_RE = re.compile(r"[Rr]s\.?|₹|,")
 
-
 def cast_decimal(val):
     val = (val or "").strip()
     if not val:
         return None
-    cleaned = _AMOUNT_JUNK_RE.sub("", val).strip()
+    cleaned = _AMOUNT_JUNK_RE.sub("", val)
+    cleaned = re.sub(r"(?<=\d)\s+(?=\d)", "", cleaned).strip()   # "39,000.0 0" -> "39000.0"
     if not cleaned:
         return None
     try:
@@ -238,7 +238,8 @@ _CASTS = {
 
 # ── lien_transactions: account/IFSC/layer split ────────────────────────────────
 
-_LAYER_RE = re.compile(r"^(.*?)\s+Layer\s*:\s*(\d+)\s*$")
+_LAYER_RE = re.compile(r"^(.*?)\s+Layer\s*:\s*(\d+)\s*$", re.I)
+_IFSC_RE = re.compile(r"[A-Z]{4}0[A-Z0-9]{6}")
 
 
 def _split_account_ifsc_layer(raw: str):
@@ -261,16 +262,17 @@ def _split_account_ifsc_layer(raw: str):
     if not m:
         return (raw or None), None, None, "ambiguous"
     prefix, layer = m.groups()
-    tokens = prefix.split()
+    compact_prefix = re.sub(r"\s+", "", prefix).upper()
     layer_int = int(layer)
-
+    ifsc_match = _IFSC_RE.search(compact_prefix)
+    if ifsc_match:
+        account = compact_prefix[:ifsc_match.start()] or None
+        ifsc = ifsc_match.group(0)
+        return account, ifsc, layer_int, "certain"
+    tokens = prefix.split()
     if len(tokens) == 1:
         return tokens[0], None, layer_int, "certain"
-    if len(tokens) == 2:
-        return tokens[0], tokens[1], layer_int, "certain"
-    if len(tokens) == 3:
-        return tokens[0], "".join(tokens[1:]), layer_int, "reconstructed"
-    return tokens[0], None, layer_int, "ambiguous"
+    return tokens[0] if tokens else None, None, layer_int, "ambiguous"
 
 
 def map_lien_transactions(rows: list) -> tuple:
@@ -313,6 +315,7 @@ def map_table(payload: dict) -> dict:
     """
     payload = copy.deepcopy(payload)
     table = payload.get("table", "<unknown>")
+    source_text_checks = payload.get("_extraction_checks")
 
     if table == "complaint_meta" or ("data" in payload and "rows" not in payload):
         data = payload.get("data") or {}
@@ -332,6 +335,7 @@ def map_table(payload: dict) -> dict:
                 "kind": "key_value",
                 "unparsed_datetimes": unparsed,
                 "status": "ok" if not unparsed else "needs_review",
+                "source_text_checks": source_text_checks,
             },
         }
 
@@ -352,6 +356,7 @@ def map_table(payload: dict) -> dict:
                 "rows": len(new_rows),
                 "flagged_rows": flagged,
                 "status": "ok" if not flagged else "needs_review",
+                "source_text_checks": source_text_checks,
             },
         }
 
@@ -390,6 +395,7 @@ def map_table(payload: dict) -> dict:
             "rows": len(new_rows),
             "unparsed_datetimes": unparsed,
             "status": "ok" if not unparsed else "needs_review",
+            "source_text_checks": source_text_checks,
         },
     }
 

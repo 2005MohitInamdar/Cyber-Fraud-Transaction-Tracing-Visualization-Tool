@@ -62,6 +62,21 @@ def _clean_header(header: list) -> list:
     return [_clean(h) for h in header]
 
 
+_IDENTIFIER_HEADER_RE = re.compile(r"(?:transaction\s*id|\butr\b|reference\s*(?:no|number))", re.I)
+
+
+def _clean_cell(value, header: str = "") -> str:
+    """Keep table-cell identifiers intact while preserving readable names."""
+    if value is None:
+        return ""
+    raw = str(value).strip()
+    if _IDENTIFIER_HEADER_RE.search(header):
+        # PDF table cells may wrap a numeric UTR across lines. There must be no
+        # artificial separator in the ID after extraction.
+        return re.sub(r"\s+", "", raw)
+    return _clean(raw)
+
+
 def _rows_to_dicts(header: list, rows: list) -> list:
     """
     Convert raw table rows to a list of dicts keyed by header names.
@@ -81,9 +96,26 @@ def _rows_to_dicts(header: list, rows: list) -> list:
     for row in rows:
         record = {}
         for col, val in zip(unique_header, row):
-            record[col] = _clean(val)
+            record[col] = _clean_cell(val, col)
         records.append(record)
     return records
+
+
+def _cell_id_round_trip(rows: list[dict], header: list, text_layer: str) -> dict:
+    """Confirm every extracted table-cell identifier survives in PDF text."""
+    id_columns = [column for column in header if _IDENTIFIER_HEADER_RE.search(column)]
+    normalized_text = re.sub(r"\s+", "", text_layer or "")
+    missing = []
+    checked = 0
+    for row in rows:
+        for column in id_columns:
+            value = re.sub(r"\s+", "", str(row.get(column, "")))
+            if len(value) < 4:
+                continue
+            checked += 1
+            if value not in normalized_text:
+                missing.append(value)
+    return {"checkedCellIds": checked, "missingCellIds": missing, "allCellIdsFound": not missing}
 
 
 def _save_json(data: dict, output_dir: Path, filename: str) -> Path:
@@ -225,6 +257,7 @@ def extract_tables(pdf_path, output_dir=None, progress=None) -> dict:
     table_raw_rows: dict[str, list] = {}   # table_name -> list of raw data rows (no header)
     meta_rows: list = []                   # complaint_meta: list of raw [key, value, ...] rows
     active_type: str | None = None         # most recently classified table — continuation target
+    pdf_text_layer = ""
 
     with pdfplumber.open(pdf_path) as pdf:
         pages = pdf.pages
@@ -235,6 +268,7 @@ def extract_tables(pdf_path, output_dir=None, progress=None) -> dict:
             return written
 
         for page_idx, page in enumerate(pages):
+            pdf_text_layer += "\n" + (page.extract_text() or "")
             page_tables = page.extract_tables()
             if not page_tables:
                 continue
@@ -291,7 +325,11 @@ def extract_tables(pdf_path, output_dir=None, progress=None) -> dict:
                 "table":   table_name,
                 "columns": header,
                 "rows":    rows,
+                "_extraction_checks": _cell_id_round_trip(rows, header, pdf_text_layer),
             }
+            checks = payload["_extraction_checks"]
+            if checks["missingCellIds"]:
+                print(f"  [extractor] WARNING: {table_name} has {len(checks['missingCellIds'])} ID(s) not found in the PDF text layer")
             written[table_name] = _save_json(
                 payload, output_dir, _TABLE_FILENAMES[table_name]
             )

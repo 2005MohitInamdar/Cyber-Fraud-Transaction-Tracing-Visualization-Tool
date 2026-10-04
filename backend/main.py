@@ -4,10 +4,12 @@ from pydantic import BaseModel, EmailStr
 from starlette.concurrency import run_in_threadpool
 from services.auth import login, signup, get_current_user
 from services.fileupload.upload import FileUploadMetadata, initiate_upload, receive_chunk
+from services.fileupload.paths import parse_upload_id
 from services.caseLeadData.lead import CaseLeadOfficer, receive_lead_data
 from services.dashboard import get_dashboard_summary, get_user_cases
 from services.upload_progress import get_events_for_user, publish
 from services.caseDetail.detail import get_case_detail
+from services.caseGraph.graph import get_case_graph
 from services.caseReport.report_email import generate_report_email, send_report_email
 from services.caseSearch.sql_search import SearchExecutionError, UnsafeQueryError, run_case_search
 
@@ -242,9 +244,14 @@ def upload_progress(request: Request, upload_id: str):
     """Return user-owned processing events for one upload."""
     try:
         user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
-        return {"events": get_events_for_user(upload_id, user_id)}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        upload_id = parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
+    try:
+        return {"events": get_events_for_user(upload_id, user_id)}
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
@@ -254,9 +261,14 @@ def case_detail(request: Request, upload_id: str):
     """Return all persisted data for one user-owned fraud case."""
     try:
         user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
-        return get_case_detail(user_id, upload_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        upload_id = parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
+    try:
+        return get_case_detail(user_id, upload_id)
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
@@ -267,6 +279,29 @@ def case_detail(request: Request, upload_id: str):
         )
 
 
+@app.get("/api/cases/{upload_id}/graph", status_code=status.HTTP_200_OK)
+def case_graph(request: Request, upload_id: str):
+    """Return the transaction-flow visualization data for one owned case."""
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        upload_id = parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
+    try:
+        return get_case_graph(user_id, upload_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        print(f"[CASE GRAPH ERROR] {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load case graph. Please try again.",
+        )
+
+
 @app.post("/api/cases/{upload_id}/report-email", status_code=status.HTTP_200_OK)
 def send_case_report_email(request: Request, upload_id: str):
     """Generate and deliver an internal report for one user-owned case."""
@@ -274,6 +309,10 @@ def send_case_report_email(request: Request, upload_id: str):
         user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        upload_id = parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
 
     try:
         case_data = get_case_detail(user_id, upload_id)
@@ -314,6 +353,10 @@ def search_case(request: Request, upload_id: str, body: CaseSearchRequest):
         user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        upload_id = parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
 
     if not body.query or not body.query.strip():
         raise HTTPException(
@@ -371,6 +414,14 @@ async def upload_chunk_route(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
+        )
+
+    try:
+        uploadId = parse_upload_id(uploadId)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid uploadId.",
         )
 
     # ── 2. Read chunk bytes ───────────────────────────────────────────────────

@@ -1,0 +1,93 @@
+<section class="case-graph" *ngIf="graph as caseGraph">
+  <div class="graph-summary" *ngIf="caseGraph.hasGraph">
+    <span>{{ caseGraph.summary.nodeCount }} transactions</span>
+    <span>{{ caseGraph.summary.edgeCount }} connections</span>
+    <span>Reported fraud: {{ amount(caseGraph.summary.reportedFraudTotal) }}</span>
+    <span>Frozen: {{ amount(caseGraph.summary.holdTotal) }}</span>
+    <span *ngIf="caseGraph.summary.unmatchedHoldCount">{{ caseGraph.summary.unmatchedHoldCount }} unmatched hold(s)</span>
+  </div>
+
+  <p *ngIf="!caseGraph.hasGraph" class="empty-graph">Transaction-flow data is not available for this case yet.</p>
+
+  <div
+    *ngIf="caseGraph.hasGraph"
+    #viewport
+    class="graph-viewport"
+    [class.is-interacting]="dragging() || panning()"
+    tabindex="0"
+    aria-label="Transaction flow graph controls"
+    (keydown)="viewportKey($event)"
+  >
+    <div class="graph-toolbar" aria-label="Graph controls">
+      <button type="button" aria-label="Zoom in" (click)="zoom(1.25)">+</button>
+      <button type="button" aria-label="Zoom out" (click)="zoom(0.8)">−</button>
+      <button type="button" aria-label="Fit graph in view" (click)="fit()">Fit</button>
+      <button type="button" aria-label="Reset node positions" (click)="reset()">Reset layout</button>
+      <output aria-label="Current zoom">{{ view().k * 100 | number:'1.0-0' }}%</output>
+    </div>
+
+    <svg
+      #graphSvg
+      [attr.viewBox]="'0 0 ' + size().width + ' ' + size().height"
+      role="img"
+      aria-label="Transaction flow graph"
+      (pointerdown)="startPan($event)"
+      (pointermove)="move($event)"
+      (pointerup)="end($event)"
+      (pointercancel)="end($event)"
+    >
+      <title>Transaction flow graph</title>
+      <g [attr.transform]="transform()">
+        <g class="layer-heading" *ngFor="let layer of layout().layers; let index = index; trackBy: trackLayer">
+          <text [attr.x]="80 + index * 240" y="28">{{ layer === 0 ? 'Victim debit' : 'Layer ' + layer }}</text>
+        </g>
+
+        <path
+          *ngFor="let edge of edges(); trackBy: trackEdge"
+          class="graph-edge"
+          [class.dimmed]="dimEdge(edge)"
+          [attr.d]="path(edge)"
+          [attr.stroke]="edge.merged ? '#f472b6' : '#94a3b8'"
+          [attr.stroke-width]="edgeWidth(edge)"
+          [attr.stroke-opacity]="(edge.confidence ?? 1) < 0.75 ? 0.35 : 0.82"
+          [attr.stroke-dasharray]="edge.ambiguous ? '7 5' : null"
+          fill="none"
+        />
+
+        <g
+          *ngFor="let node of drawnNodes(); trackBy: trackNode"
+          class="graph-node"
+          [class.dimmed]="dimNode(node)"
+          [attr.transform]="'translate(' + node.x + ' ' + node.y + ')'"
+          tabindex="0"
+          (pointerdown)="startDrag($event, node)"
+          (pointerenter)="show($event, node)"
+          (pointerleave)="clear()"
+          (focus)="show($event, node)"
+          (blur)="clear()"
+          (keydown)="nodeKey($event, node)"
+        >
+          <circle *ngIf="node.frozenAmount > 0" class="frozen-ring" [attr.r]="node.radius + 4"></circle>
+          <circle class="node-core" [class.estimated]="node.amountEstimated" [attr.r]="node.radius" [attr.fill]="color(node)"></circle>
+          <text class="node-amount" text-anchor="middle" dominant-baseline="central" [attr.fill]="textColor(node)" [attr.font-size]="radiusText(node)">{{ compact(node.disputedAmount) }}</text>
+          <text class="node-label" text-anchor="middle" [attr.y]="node.radius + 17">{{ label(node) }}</text>
+        </g>
+      </g>
+    </svg>
+
+    <div *ngIf="tooltip() as tip" class="graph-tooltip" role="tooltip" [style.left.px]="tip.x" [style.top.px]="tip.y">
+      <strong>{{ tip.title }}</strong>
+      <span *ngFor="let line of tip.lines">{{ line }}</span>
+    </div>
+  </div>
+
+  <div *ngIf="caseGraph.hasGraph" class="graph-legend" aria-label="Graph legend">
+    <span><i class="legend-dot victim"></i>Victim debit</span>
+    <span><i class="legend-dot intermediate"></i>Intermediate</span>
+    <span><i class="legend-dot end"></i>End of trail</span>
+    <span><i class="legend-dot isolated"></i>Isolated</span>
+    <span><i class="legend-ring"></i>Frozen funds</span>
+    <span><i class="legend-dash"></i>Estimated / ambiguous</span>
+    <span class="legend-note">Number inside circle = disputed amount; circle size grows with it. Drag nodes to move them. Ctrl/⌘ + scroll to zoom. Drag the background to pan.</span>
+  </div>
+</section>

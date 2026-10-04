@@ -38,6 +38,65 @@ export interface CaseSearchResult {
   sql: string;
   rows: Record<string, unknown>[];
 }
+
+export interface CaseGraphHold {
+  holdId: string;
+  amount: number | null;
+  date: string | null;
+  actionTakenBy: string;
+  matchRule: string;
+  confidence: number | null;
+}
+
+export interface CaseGraphNode {
+  id: string;
+  layer: number;
+  bank: string;
+  actionTakenBy: string;
+  accountNo: string;
+  utr: string;
+  txAmount: number | null;
+  disputedAmount: number | null;
+  amountEstimated: boolean;
+  frozenAmount: number;
+  unaccountedAmount: number | null;
+  embeddedIds: unknown[];
+  rootIds: unknown[];
+  remarks: string;
+  role: 'victim' | 'intermediate' | 'endOfTrail' | 'isolated';
+  holds: CaseGraphHold[];
+}
+
+export interface CaseGraphEdge {
+  source: string;
+  target: string;
+  matchRule: string;
+  confidence: number | null;
+  amountPassed: number | null;
+  ambiguous: boolean;
+  merged: boolean;
+  amountEstimated: boolean;
+}
+
+export interface CaseGraph {
+  hasGraph: boolean;
+  summary: {
+    ackNo: string | null;
+    status: string | null;
+    baseDebitTotal: number | null;
+    reportedFraudTotal: number | null;
+    holdTotal: number | null;
+    reportedLienTotal: number | null;
+    holdsMatchLien: boolean;
+    nodeCount: number;
+    edgeCount: number;
+    layers: number[];
+    unmatchedHoldCount: number;
+  };
+  nodes: CaseGraphNode[];
+  edges: CaseGraphEdge[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -46,6 +105,10 @@ export class Case_Details {
   
     getCaseDetail(uploadId: string): Observable<CaseDetail> {
       return this.http.get<CaseDetail>(`${environment.apiBaseUrl}/api/cases/${uploadId}`);
+    }
+
+    getCaseGraph(uploadId: string): Observable<CaseGraph> {
+      return this.http.get<CaseGraph>(`${environment.apiBaseUrl}/api/cases/${uploadId}/graph`);
     }
 
     sendReportEmail(uploadId: string): Observable<{ message: string; subject: string }> {

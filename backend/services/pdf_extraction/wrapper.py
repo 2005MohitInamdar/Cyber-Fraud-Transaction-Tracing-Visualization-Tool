@@ -148,7 +148,10 @@ import argparse
 from .extractor import extract_tables
 from .normalization import normalize_directory
 from .correct_columns import map_directory
+# Database commits are intentionally paused while transaction-flow matching is
+# being developed. Keep commit_to_db.py untouched so it can be re-enabled later.
 from .commit_to_db import load_all
+from .transaction_flow import build_transaction_flow
 from ..upload_progress import publish
 from ..caseDetail.detail import invalidate_case_detail
 
@@ -211,11 +214,14 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
     if not escalations and not review_flags:
         print("\nNo escalations or flags - every table mapped cleanly, ready to load.")
 
+    print("Building transaction flow")
+    progress("Connecting transactions across layers and frozen accounts.")
+    flow_result = build_transaction_flow(db_schema_dir, progress=progress)
+
+    # Database commits are disabled for now. This is the complete previous
+    # persistence block, intentionally left inactive until DB loading resumes.
     print("Pushing to database")
     progress("Saving extracted case data to the database.")
-
-    # The request was authenticated before chunk handling. Keep both IDs
-    # explicit so all extracted records are linked to the exact case upload.
     load_results = load_all(user_id, upload_id, db_schema_dir, progress=progress)
     failed_tables = [
         table for table, result in load_results.items()
@@ -230,6 +236,7 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
     else:
         invalidate_case_detail(upload_id)
         progress("Case processing completed successfully.", "complete")
+    progress("Case extraction and transaction-flow matching completed.", "complete")
 
     return {
         "raw_dir": raw_dir,
@@ -240,7 +247,8 @@ def run_pipeline(pdf_path, user_id: str, upload_id: str, output_root=None) -> di
         "mapped": mapped,
         "escalations": escalations,
         "review_flags": review_flags,
-        "load_results": load_results,
+        "transaction_flow": flow_result,
+        "load_results": None,
     }
 
 

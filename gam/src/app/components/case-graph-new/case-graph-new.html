@@ -58,6 +58,7 @@
           *ngFor="let node of drawnNodes(); trackBy: trackNode"
           class="graph-node"
           [class.dimmed]="dimNode(node)"
+          [class.pulse]="pulsing() === node.id"
           [attr.transform]="'translate(' + node.x + ' ' + node.y + ')'"
           tabindex="0"
           (pointerdown)="startDrag($event, node)"
@@ -71,6 +72,9 @@
           <circle class="node-core" [class.estimated]="node.amountEstimated" [attr.r]="node.radius" [attr.fill]="color(node)"></circle>
           <text class="node-amount" text-anchor="middle" dominant-baseline="central" [attr.fill]="textColor(node)" [attr.font-size]="radiusText(node)">{{ compact(node.disputedAmount) }}</text>
           <text class="node-label" text-anchor="middle" [attr.y]="node.radius + 17">{{ label(node) }}</text>
+          <g *ngIf="node.completeness?.status === 'incomplete'" class="incomplete-badge" [attr.transform]="'translate(' + (node.radius * .72) + ' ' + (-node.radius * .72) + ')'">
+            <circle r="8" [attr.fill]="badgeColor(node)"></circle><text text-anchor="middle" dominant-baseline="central">!</text>
+          </g>
         </g>
       </g>
     </svg>
@@ -88,6 +92,7 @@
     <span><i class="legend-dot isolated"></i>Isolated</span>
     <span><i class="legend-ring"></i>Frozen funds</span>
     <span><i class="legend-dash"></i>Estimated / ambiguous</span>
+    <span><i class="legend-alert">!</i>Incomplete information; see the list below the graph.</span>
     <span class="legend-note">Number inside circle = disputed amount; circle size grows with it. Drag nodes to move them. Ctrl/⌘ + scroll to zoom. Drag the background to pan.</span>
   </div>
 </section>

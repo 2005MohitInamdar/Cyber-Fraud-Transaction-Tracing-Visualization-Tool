@@ -44,7 +44,8 @@
         <h2>Transaction flow</h2>
         <p class="no-records" *ngIf="isGraphLoading()">Loading transaction flow…</p>
         <p class="state-message state-message--error" *ngIf="graphError()">Unable to load transaction flow.</p>
-        <app-case-graph-new *ngIf="graph() as caseGraph" [graph]="caseGraph" />
+        <app-case-graph-new *ngIf="graph() as caseGraph" [graph]="caseGraph" [focusId]="focusId()" />
+        <app-incomplete-nodes *ngIf="graph()?.nodes?.length" [items]="incompleteItems()" [selectedId]="focusId()" (itemSelect)="focusIncompleteNode($event)" />
       </section>
     </ng-container>
   </ng-container>

@@ -1,0 +1,31 @@
+<section class="incomplete-panel">
+  <h3>Incomplete trail details ({{ sourceItems().length }})</h3>
+  <p>These accounts have missing information about what happened to the money before or after them.</p>
+  <p *ngIf="!sourceItems().length" class="complete-state">Every node has complete before/after information.</p>
+  <ng-container *ngFor="let group of groups(); trackBy: trackGroup">
+    <section class="incomplete-group">
+      <h4>{{ group.title }} <span>{{ group.items.length }}</span></h4>
+      <div class="item-list">
+        <ng-container *ngFor="let item of group.items; trackBy: trackItem">
+          <button *ngIf="item.kind === 'node'; else holdCard" type="button" class="incomplete-card" [class]="severityClass(item)" [class.selected]="item.nodeId === selectedId" [id]="cardId(item)" role="button" tabindex="0" [attr.aria-label]="accessible(item)" (click)="select(item)" (keydown)="keydown($event, item)" (pointerenter)="show($event, item)" (pointerleave)="hide()" (focus)="show($event, item)" (blur)="hide()">
+            <ng-container *ngTemplateOutlet="cardContent; context: {$implicit: item}"></ng-container>
+          </button>
+          <ng-template #holdCard><div class="incomplete-card hold-card" [class]="severityClass(item) + ' hold-card'" [id]="cardId(item)" (pointerenter)="show($event, item)" (pointerleave)="hide()"><ng-container *ngTemplateOutlet="cardContent; context: {$implicit: item}"></ng-container></div></ng-template>
+        </ng-container>
+      </div>
+    </section>
+  </ng-container>
+  <div *ngIf="tooltip() as tip" class="incomplete-tooltip" role="tooltip" [style.left.px]="tip.x" [style.top.px]="tip.y">
+    <strong>{{ tip.item.bank || tip.item.accountNo || 'Unknown account' }}</strong><span *ngIf="tip.item.remarks">Remarks: {{ tip.item.remarks }}</span><ul><li *ngFor="let reason of tip.item.reasons">{{ reason.message }}</li></ul>
+  </div>
+</section>
+
+<ng-template #cardContent let-item>
+  <div class="card-header"><strong [attr.title]="item.bank || item.accountNo || 'Unknown account'">{{ item.bank || item.accountNo || 'Unknown account' }}</strong><span *ngIf="item.kind === 'node'; else holdTag" class="severity-pill">{{ severityText(item) }}</span><ng-template #holdTag><span class="hold-tag">HOLD</span></ng-template></div>
+  <div class="card-amount">{{ amount(item) }}</div>
+  <div class="card-details">
+    <span *ngIf="item.kind === 'node' && item.accountNo"><b>Account:</b> {{ item.accountNo }}</span><span *ngIf="item.kind === 'node' && item.utr"><b>UTR:</b> {{ item.utr }}</span><span *ngIf="item.kind === 'node' && (item.unaccountedAmount ?? 0) > 0"><b>Unaccounted:</b> {{ amount({kind: 'hold', amount: item.unaccountedAmount, accountNo: '', severity: item.severity, reasons: []}) }}</span>
+    <span *ngIf="item.kind === 'hold' && item.accountNo"><b>Account:</b> {{ item.accountNo }}</span><span *ngIf="item.kind === 'hold' && item.date"><b>Date:</b> {{ item.date }}</span><span *ngIf="item.kind === 'hold' && item.actionTakenBy"><b>Action:</b> {{ item.actionTakenBy }}</span>
+  </div>
+  <p class="card-reason">{{ item.reasons[0]?.message }}</p><span *ngIf="item.reasons.length > 1" class="more-reasons">+{{ item.reasons.length - 1 }} more</span>
+</ng-template>

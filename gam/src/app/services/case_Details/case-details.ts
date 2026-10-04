@@ -48,6 +48,36 @@ export interface CaseGraphHold {
   confidence: number | null;
 }
 
+export interface CompletenessReason {
+  code: string;
+  message: string;
+}
+
+export interface NodeCompleteness {
+  status: 'complete' | 'incomplete';
+  reasons: CompletenessReason[];
+  resolvedBy: 'hold' | 'pending' | 'withdrawal_note' | null;
+}
+
+export interface IncompleteItem {
+  kind: 'node' | 'hold';
+  nodeId?: string;
+  holdId?: string;
+  layer?: number;
+  bank?: string;
+  accountNo: string;
+  utr?: string;
+  disputedAmount?: number | null;
+  txAmount?: number | null;
+  unaccountedAmount?: number | null;
+  amount?: number | null;
+  date?: string | null;
+  actionTakenBy?: string;
+  remarks?: string;
+  severity: 'high' | 'medium' | 'low';
+  reasons: CompletenessReason[];
+}
+
 export interface CaseGraphNode {
   id: string;
   layer: number;
@@ -65,6 +95,7 @@ export interface CaseGraphNode {
   remarks: string;
   role: 'victim' | 'intermediate' | 'endOfTrail' | 'isolated';
   holds: CaseGraphHold[];
+  completeness?: NodeCompleteness;
 }
 
 export interface CaseGraphEdge {
@@ -92,9 +123,13 @@ export interface CaseGraph {
     edgeCount: number;
     layers: number[];
     unmatchedHoldCount: number;
+    incompleteCount?: number;
+    orphanHoldCount?: number;
   };
   nodes: CaseGraphNode[];
   edges: CaseGraphEdge[];
+  incomplete?: IncompleteItem[];
+  orphanHolds?: IncompleteItem[];
 }
 
 @Injectable({

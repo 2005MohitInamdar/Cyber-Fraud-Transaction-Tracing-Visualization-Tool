@@ -155,6 +155,7 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
 
   // The input. Getter and setter share one type, which fixes the TS2322 error.
   private current!: CaseGraph;
+  private pulseTimer?: ReturnType<typeof setTimeout>;
 
   @Input({ required: true })
   set graph(value: CaseGraph) {
@@ -168,6 +169,11 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
     return this.current;
   }
 
+  @Input()
+  set focusId(value: string | null) {
+    if (value) queueMicrotask(() => this.focusNode(value));
+  }
+
   // ── State ──────────────────────────────────────────────────────────────────
   readonly layout = signal<GraphLayout>({ width: 420, height: 260, nodes: [], edges: [], layers: [] });
   readonly positions = signal<Record<string, Point>>({}); // user drag overrides
@@ -177,6 +183,7 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
   readonly dragging = signal<DragState | null>(null);
   readonly panning = signal<PanState | null>(null);
   readonly tooltip = signal<TooltipState | null>(null);
+  readonly pulsing = signal<string | null>(null);
 
   private observer?: ResizeObserver;
   private viewportOrigin: Point = { x: 0, y: 0 }; // viewport's top-left in client coords
@@ -216,6 +223,19 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
 
   color(n: LayoutNode): string {
     return ROLE_COLORS[n.role] ?? ROLE_COLORS['isolated'];
+  }
+
+  incompleteSeverity(n: LayoutNode): 'high' | 'medium' | 'low' | null {
+    const severities = (n.completeness?.reasons ?? []).map((reason) => {
+      if (reason.code === 'UNACCOUNTED_AMOUNT') return 'medium';
+      if (reason.code === 'AMOUNT_ESTIMATED' || reason.code === 'LOW_CONFIDENCE_LINK') return 'low';
+      return 'high';
+    });
+    return severities.includes('high') ? 'high' : severities.includes('medium') ? 'medium' : severities.includes('low') ? 'low' : null;
+  }
+
+  badgeColor(n: LayoutNode): string {
+    return { high: '#f87171', medium: '#fbbf24', low: '#94a3b8' }[this.incompleteSeverity(n) ?? 'low'];
   }
 
   textColor(n: LayoutNode): string {
@@ -419,6 +439,24 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
     queueMicrotask(() => this.fitIfPending());
   }
 
+  private focusNode(id: string): void {
+    const node = this.nodes().find((item) => item.id === id);
+    if (!node || !this.viewport) return;
+    const size = this.size();
+    let view = this.view();
+    if (view.k < 0.8) {
+      const anchorX = node.x * view.k + view.tx;
+      const anchorY = node.y * view.k + view.ty;
+      view = zoomAt(view, 0.8 / view.k, anchorX, anchorY, MIN_ZOOM, MAX_ZOOM);
+    }
+    this.view.set({ ...view, tx: size.width / 2 - node.x * view.k, ty: size.height / 2 - node.y * view.k });
+    this.hovered.set(id);
+    this.tooltip.set(null);
+    this.pulsing.set(id);
+    if (this.pulseTimer) clearTimeout(this.pulseTimer);
+    this.pulseTimer = setTimeout(() => this.pulsing.set(null), 1500);
+  }
+
   /**
    * Fit only when a fit is pending (new graph or reset), so a window resize
    * doesn't throw away the user's current zoom and pan.
@@ -496,11 +534,15 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
       ['Remarks', n.remarks],
     ];
 
+    const status = n.completeness?.status === 'incomplete'
+      ? n.completeness.reasons.map((reason) => reason.message).join(' ')
+      : n.completeness ? 'Complete' : null;
+
     this.tooltip.set({
       x: Math.max(8, Math.min(pointer.x + 14, Math.max(8, size.width - 280))),
       y: Math.max(8, Math.min(pointer.y + 14, Math.max(8, size.height - 160))),
       title: n.bank || n.id,
-      lines: fields.filter(([, value]) => value && value !== '—').map(([key, value]) => `${key}: ${value}`),
+      lines: [...fields, ['Status', status]].filter(([, value]) => value && value !== '—').map(([key, value]) => `${key}: ${value}`),
     });
   }
 

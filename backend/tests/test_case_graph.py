@@ -1,47 +1,73 @@
-from datetime import date
 from decimal import Decimal
 
 from services.caseGraph.graph import build_graph_payload
 
 
-def test_build_graph_payload_normalises_rows_and_drops_dangling_edges() -> None:
-    graph = build_graph_payload(
-        {
-            "ack_no": "ACK-1",
-            "base_debit_total": Decimal("100.00"),
-            "holds_match_lien": 1,
-            "unmatched_hold_count": 1,
-        },
-        [
-            {"node_id": "node:b", "layer": 1, "bank": "Bank B", "amount_estimated": 1, "embedded_ids": '["x"]'},
-            {"node_id": "node:a", "layer": 0, "bank": "Bank A", "tx_amount": Decimal("100"), "root_ids": b'["root"]'},
-        ],
-        [
-            {"from_node": "node:a", "to_node": "node:b", "match_rule": "utr", "confidence": Decimal("0.9")},
-            {"from_node": "node:a", "to_node": "missing", "match_rule": "utr", "confidence": Decimal("0.9")},
-        ],
-        [{"hold_id": "hold:1", "hold_amount": Decimal("50"), "hold_date": date(2026, 1, 1), "action_taken_by": "Bank B"}],
-        [{"hold_id": "hold:1", "node_id": "node:b", "match_rule": "account", "confidence": Decimal("0.8"), "amount": Decimal("50")}],
+def _node(node_id, layer, amount=100, **extra):
+    return {"node_id": node_id, "layer": layer, "bank": extra.pop("bank", "Example Bank"), "disputed_amount": Decimal(str(amount)), **extra}
+
+
+def _edge(source, target, amount=100, **extra):
+    return {"from_node": source, "to_node": target, "amount_passed": Decimal(str(amount)), "confidence": Decimal(".9"), **extra}
+
+
+def _graph(nodes, edges, holds=None, links=None, pending=None):
+    return build_graph_payload({"ack_no": "ACK"}, nodes, edges, holds or [], links or [], pending)
+
+
+def _item(graph, node_id):
+    return next(item for item in graph["incomplete"] if item["nodeId"] == node_id)
+
+
+def _codes(graph, node_id):
+    return [reason["code"] for reason in _item(graph, node_id)["reasons"]]
+
+
+def test_chain_only_flags_dead_end() -> None:
+    graph = _graph([_node("a", 0), _node("b", 1), _node("c", 2)], [_edge("a", "b"), _edge("b", "c")])
+    assert graph["nodes"][0]["completeness"]["status"] == "complete"
+    assert graph["nodes"][1]["completeness"]["status"] == "complete"
+    assert _codes(graph, "c") == ["END_NO_STATUS"]
+
+
+def test_full_linked_hold_resolves_dead_end_and_partial_hold_does_not() -> None:
+    nodes = [_node("a", 0), _node("c", 1, Decimal("1998.27"))]
+    edges = [_edge("a", "c", Decimal("1998.27"))]
+    full = _graph(nodes, edges, [{"hold_id": "h", "hold_amount": Decimal("1998.27")}], [{"hold_id": "h", "node_id": "c", "amount": Decimal("1998.27")}])
+    assert full["nodes"][1]["completeness"] == {"status": "complete", "reasons": [], "resolvedBy": "hold"}
+    partial = _graph(nodes, edges, [{"hold_id": "h", "hold_amount": Decimal("21.42")}], [{"hold_id": "h", "node_id": "c", "amount": Decimal("21.42")}])
+    assert _codes(partial, "c") == ["UNACCOUNTED_AMOUNT"]
+
+
+def test_pending_uses_exact_bank_token_sets_and_withdrawal_notes_resolve() -> None:
+    nodes = [_node("a", 0), _node("c", 1, bank="NSDL Payments Bank Ltd")]
+    edges = [_edge("a", "c")]
+    short = _graph(nodes, edges, pending=[{"bank": "NSDL"}])
+    assert "END_NO_STATUS" in _codes(short, "c")
+    exact = _graph(nodes, edges, pending=[{"bank": "NSDL Payments Bank Ltd"}])
+    assert exact["nodes"][1]["completeness"]["resolvedBy"] == "pending"
+    withdrawal = _graph([_node("a", 0), _node("c", 1, remarks="Cash withdrawn at ATM")], edges)
+    assert withdrawal["nodes"][1]["completeness"]["resolvedBy"] == "withdrawal_note"
+    balance = _graph([_node("a", 0), _node("c", 1, remarks="Statement Ending Balance =276.50")], edges)
+    assert "END_NO_STATUS" in _codes(balance, "c")
+
+
+def test_unmatched_links_amounts_orphans_and_deterministic_order() -> None:
+    graph = _graph(
+        [_node("victim", 0), _node("orphan", 1), _node("parent", 1, Decimal("29800.15")), _node("child", 2, Decimal("26881.84"))],
+        [_edge("parent", "child", Decimal("26881.84"))],
+        [{"hold_id": "linked", "hold_amount": Decimal("2818.31")}, {"hold_id": "orphan-hold", "hold_amount": 20}],
+        [{"hold_id": "linked", "node_id": "parent", "amount": Decimal("2818.31")}],
     )
+    assert "VICTIM_UNTRACED" in _codes(graph, "victim")
+    assert "NO_INCOMING_LINK" in _codes(graph, "orphan")
+    assert "UNACCOUNTED_AMOUNT" in _codes(graph, "parent")
+    assert graph["orphanHolds"][0]["holdId"] == "orphan-hold"
+    assert graph["summary"]["orphanHoldCount"] == 1
+    assert graph["incomplete"] == sorted(graph["incomplete"], key=lambda item: ({"high": 0, "medium": 1, "low": 2}[item["severity"]], item["layer"], item["nodeId"]))
 
+
+def test_old_callers_without_pending_rows_remain_supported() -> None:
+    graph = build_graph_payload({"ack_no": "ACK"}, [], [], [], [])
     assert graph["hasGraph"] is True
-    assert graph["summary"]["nodeCount"] == 2
-    assert graph["summary"]["edgeCount"] == 1
-    assert graph["summary"]["holdsMatchLien"] is True
-    assert graph["nodes"][0]["id"] == "node:a"
-    assert graph["nodes"][0]["role"] == "victim"
-    assert graph["nodes"][1]["role"] == "endOfTrail"
-    assert graph["nodes"][1]["holds"][0]["date"] == "2026-01-01"
-
-
-def test_build_graph_payload_without_case_has_no_graph() -> None:
-    assert build_graph_payload(None, [], [], [], []) == {
-        "hasGraph": False,
-        "summary": {
-            "ackNo": None, "status": None, "baseDebitTotal": None,
-            "reportedFraudTotal": None, "holdTotal": None, "reportedLienTotal": None,
-            "holdsMatchLien": False, "nodeCount": 0, "edgeCount": 0,
-            "layers": [], "unmatchedHoldCount": 0,
-        },
-        "nodes": [], "edges": [],
-    }
+    assert graph["incomplete"] == []

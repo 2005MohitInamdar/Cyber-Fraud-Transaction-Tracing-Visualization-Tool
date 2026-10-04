@@ -1,14 +1,15 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { CaseDetail, Case_Details, CaseGraph } from '../../services/case_Details/case-details';
 import { SearhedSQL } from '../searhed-sql/searhed-sql';
 import { CaseGraphNew } from '../case-graph-new/case-graph-new'; 
+import { IncompleteNodesComponent } from '../incomplete-nodes/incomplete-nodes';
 
 @Component({
   selector: 'app-case-details',
   standalone:true,
-  imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew],
+  imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew, IncompleteNodesComponent],
   templateUrl: './case-details.html',
   styleUrl: './case-details.scss',
 })
@@ -24,6 +25,11 @@ export class CaseDetails implements OnInit {
   readonly isGraphLoading = signal(true);
   readonly graphError = signal(false);
   readonly showRawTables = signal(false);
+  readonly focusId = signal<string | null>(null);
+  readonly incompleteItems = computed(() => [
+    ...(this.graph()?.incomplete ?? []),
+    ...(this.graph()?.orphanHolds ?? []),
+  ]);
 
   private readonly route = inject(ActivatedRoute);
   private readonly caseDetailService = inject(Case_Details);
@@ -99,5 +105,11 @@ export class CaseDetails implements OnInit {
 
   toggleRawTables(): void {
     this.showRawTables.update((shown) => !shown);
+  }
+
+  focusIncompleteNode(nodeId: string): void {
+    // A repeat selection must still run the graph component's focus input setter.
+    this.focusId.set(null);
+    queueMicrotask(() => this.focusId.set(nodeId));
   }
 }

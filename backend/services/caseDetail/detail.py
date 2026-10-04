@@ -37,7 +37,11 @@ def _cache_key(upload_id: str) -> str:
 
 def invalidate_case_detail(upload_id: str) -> None:
     """Remove a cached snapshot after case data changes."""
-    get_redis().delete(_cache_key(upload_id), f"case:{upload_id}:graph")
+    get_redis().delete(
+        _cache_key(upload_id),
+        f"case:{upload_id}:graph",
+        f"case:{upload_id}:graph:v2",
+    )
 
 
 def _camel_case(name: str) -> str:

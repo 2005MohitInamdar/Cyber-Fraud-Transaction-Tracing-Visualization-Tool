@@ -7,6 +7,7 @@ import { NewFraudCase } from './components/new-fraud-case/new-fraud-case';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
 import { CaseDetails } from './components/case-details/case-details';
+import { SendEmail } from './components/send-email/send-email';
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
 
@@ -19,4 +20,5 @@ export const routes: Routes = [
   { path: 'dashboard',    component: Dashboard,    canActivate: [authGuard] },
   { path: 'dashboard/cases/:uploadId', component: CaseDetails, canActivate: [authGuard] },
   { path: 'newFraudCase', component: NewFraudCase, canActivate: [authGuard] },
+  { path: 'dashboard/cases/:uploadId/send-email', component: SendEmail, canActivate: [authGuard] },
 ];

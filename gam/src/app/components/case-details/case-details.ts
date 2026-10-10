@@ -11,7 +11,7 @@ import { IncompleteNodesComponent } from '../incomplete-nodes/incomplete-nodes';
   standalone:true,
   imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew, IncompleteNodesComponent],
   templateUrl: './case-details.html',
-  styleUrl: './case-details.scss',
+  styleUrls: ['./case-details.scss'],
 })
 export class CaseDetails implements OnInit {
   readonly caseDetail = signal<CaseDetail | null>(null);
@@ -26,10 +26,16 @@ export class CaseDetails implements OnInit {
   readonly graphError = signal(false);
   readonly showRawTables = signal(false);
   readonly focusId = signal<string | null>(null);
+  readonly requisitionOpen = signal(false);
   readonly incompleteItems = computed(() => [
     ...(this.graph()?.incomplete ?? []),
     ...(this.graph()?.orphanHolds ?? []),
   ]);
+  readonly incompleteCount = computed(() => this.incompleteItems().length);
+  /** The ack_no from the graph summary, if available, to prefill the panel. */
+  readonly prefillAckNo = computed(
+    () => this.graph()?.summary?.ackNo ?? null,
+  );
 
   private readonly route = inject(ActivatedRoute);
   private readonly caseDetailService = inject(Case_Details);
@@ -108,7 +114,6 @@ export class CaseDetails implements OnInit {
   }
 
   focusIncompleteNode(nodeId: string): void {
-    // A repeat selection must still run the graph component's focus input setter.
     this.focusId.set(null);
     queueMicrotask(() => this.focusId.set(nodeId));
   }

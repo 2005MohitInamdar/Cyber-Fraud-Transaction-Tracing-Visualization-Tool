@@ -225,3 +225,28 @@ create table if not exists placeholder(
     upload_id         	CHAR(36)    NOT NULL
 );
 
+
+desc requisitions;
+
+CREATE TABLE requisitions (
+    id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    upload_id        CHAR(36)     NOT NULL,
+    supabase_user_id CHAR(36)     NOT NULL,
+    ack_no           VARCHAR(32)  NULL,
+    bank_name        VARCHAR(255) NOT NULL,
+    normalized_name  VARCHAR(255) NOT NULL,
+    to_emails        JSON         NOT NULL,
+    delivered_to     VARCHAR(320) NULL,
+    reply_to         VARCHAR(320) NOT NULL,
+    subject          VARCHAR(500) NOT NULL,
+    body_text        MEDIUMTEXT   NOT NULL,
+    item_hash        CHAR(64)     NOT NULL,
+    test_mode        TINYINT      NOT NULL DEFAULT 0,
+    status           VARCHAR(16)  NOT NULL DEFAULT 'sending',
+    message_id       VARCHAR(255) NULL,
+    error_message    VARCHAR(500) NULL,
+    created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at          DATETIME     NULL,
+    KEY idx_req_dup  (upload_id, normalized_name, item_hash, status),
+    KEY idx_req_user (supabase_user_id, upload_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

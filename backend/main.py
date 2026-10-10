@@ -12,6 +12,9 @@ from services.caseDetail.detail import get_case_detail
 from services.caseGraph.graph import get_case_graph
 from services.caseReport.report_email import generate_report_email, send_report_email
 from services.caseSearch.sql_search import SearchExecutionError, UnsafeQueryError, run_case_search
+from services.email.requisition_service import (
+    preview_single, send_single, SinglePreviewRequest, SingleSendRequest,
+)
 
 # ─── Cookie config (single source of truth) ──────────────────────────────────
 _COOKIE_NAME    = "access_token"
@@ -458,3 +461,60 @@ async def upload_chunk_route(
         )
 
     return result
+
+# ─── Requisition Email Routes ─────────────────────────────────────────────────
+
+def _auth_and_upload(request: Request, upload_id: str) -> tuple[str, str]:
+    try:
+        user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    try:
+        return user_id, parse_upload_id(upload_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
+
+
+@app.post("/api/cases/{upload_id}/requisitions/preview", status_code=status.HTTP_200_OK)
+def requisitions_preview(request: Request, upload_id: str, body: SinglePreviewRequest):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        return preview_single(user_id, upload_id, body)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        print(f"[REQUISITION PREVIEW ERROR] {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate the email.")
+
+
+
+@app.post("/api/cases/{upload_id}/requisitions/send", status_code=status.HTTP_200_OK)
+def requisitions_send(request: Request, upload_id: str, body: SingleSendRequest):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        return send_single(user_id, upload_id, body)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        print(f"[REQUISITION SEND ERROR] {e}")
+        raise HTTPException(status_code=500, detail="Failed to send the email.")
+
+
+# @app.get("/api/cases/{upload_id}/requisitions", status_code=status.HTTP_200_OK)
+# def requisitions_list(request: Request, upload_id: str):
+#     """Sent / failed history for this case."""
+#     user_id, upload_id = _auth_and_upload(request, upload_id)
+#     try:
+#         return list_requisitions(user_id, upload_id)
+#     except PermissionError as e:
+#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+#     except Exception as e:
+#         print(f"[REQUISITION LIST ERROR] {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Failed to load requisition history.",
+#         )

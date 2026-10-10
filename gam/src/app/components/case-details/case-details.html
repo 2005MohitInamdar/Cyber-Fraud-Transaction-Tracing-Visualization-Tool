@@ -17,27 +17,17 @@
         <small>Created {{ detail.upload.createdAt | date:'medium' }}</small>
       </div>
     </header>
-
-    <div class="report-email-action">
-      <button
-        class="send-report-btn"
-        (click)="sendReportEmail()"
-        [disabled]="isSendingReport()"
-      >
-        {{ isSendingReport() ? 'Sending…' : 'Generate & Send Report Email' }}
-      </button>
-      <p *ngIf="reportSendResult() === 'success'" class="report-status report-status--success">
-        Report email sent.
-      </p>
-      <p *ngIf="reportSendResult() === 'error'" class="report-status report-status--error">
-        {{ reportErrorMessage() }}
-      </p>
+    
+    <!-- Request missing data from banks: opens the send-email page -->
+    <div class="report-email-action" *ngIf="incompleteCount() > 0">
+      <a class="send-report-btn"
+         [routerLink]="['/dashboard/cases', detail.uploadId, 'send-email']"
+         [queryParams]="{ ackNo: prefillAckNo() }">
+        Request missing data from banks ({{ incompleteCount() }})
+      </a>
     </div>
 
-    <app-searhed-sql
-      [uploadId]="detail.uploadId"
-      (activeTabChange)="setActiveTab($event)"
-    />
+    <app-searhed-sql [uploadId]="detail.uploadId" (activeTabChange)="setActiveTab($event)" />
 
     <ng-container *ngIf="activeTab() === 'all'">
       <section class="data-section graph-section">

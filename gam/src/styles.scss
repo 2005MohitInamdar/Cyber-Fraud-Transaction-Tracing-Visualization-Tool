@@ -1,15 +1,15 @@
 /* Global reset — removes browser-default margin/padding on all elements */
 // @import "tailwindcss";
 @import "tailwindcss/index.css";
+// @import "tailwindcss";
 
-
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+// *,
+// *::before,
+// *::after {
+//   margin: 0;
+//   padding: 0;
+//   box-sizing: border-box;
+// }
 
 html,
 body {

@@ -1,4 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, status, Response, UploadFile, File, Form
+from pathlib import Path
+from uuid import uuid4
+import hashlib
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from starlette.concurrency import run_in_threadpool
@@ -13,8 +16,12 @@ from services.caseGraph.graph import get_case_graph
 from services.caseReport.report_email import generate_report_email, send_report_email
 from services.caseSearch.sql_search import SearchExecutionError, UnsafeQueryError, run_case_search
 from services.email.requisition_service import (
-    preview_single, send_single, SinglePreviewRequest, SingleSendRequest,
+    preview_single, send_single, list_requisitions, SinglePreviewRequest, SingleSendRequest,
 )
+from services.fileupload.paths import safe_join
+from services.bankResponse.parse import MAX_RESPONSE_BYTES, parse_response
+from services.bankResponse.service import add_row, create_parsed_response, list_responses, update_row
+from services.bankResponse.rebuild import rebuild_case
 
 # ─── Cookie config (single source of truth) ──────────────────────────────────
 _COOKIE_NAME    = "access_token"
@@ -28,6 +35,23 @@ class InitiateUploadRequest(BaseModel):
 
 class CaseSearchRequest(BaseModel):
     query: str
+
+
+class ResponseRowPatch(BaseModel):
+    included: bool | None = None
+    data: dict = {}
+
+
+class ResponseRowCreate(BaseModel):
+    tableName: str
+    data: dict
+
+
+class ApplyBankResponseRequest(BaseModel):
+    anchorNodeId: str | None = None
+    layerShift: int | None = None
+    annotation: dict | None = None
+    changeNote: str | None = None
 
 
 app = FastAPI()
@@ -283,7 +307,7 @@ def case_detail(request: Request, upload_id: str):
 
 
 @app.get("/api/cases/{upload_id}/graph", status_code=status.HTTP_200_OK)
-def case_graph(request: Request, upload_id: str):
+def case_graph(request: Request, upload_id: str, revision: int | None = None):
     """Return the transaction-flow visualization data for one owned case."""
     try:
         user_id = get_current_user(request.cookies.get(_COOKIE_NAME))
@@ -294,7 +318,7 @@ def case_graph(request: Request, upload_id: str):
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
     try:
-        return get_case_graph(user_id, upload_id)
+        return get_case_graph(user_id, upload_id, revision=revision)
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
@@ -475,6 +499,102 @@ def _auth_and_upload(request: Request, upload_id: str) -> tuple[str, str]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid uploadId.")
 
 
+@app.post("/api/cases/{upload_id}/responses/parse", status_code=status.HTTP_201_CREATED)
+async def parse_bank_response(request: Request, upload_id: str, file: UploadFile = File(...), requisitionId: int | None = Form(None)):
+    """Store and parse a bank PDF in an isolated temporary pipeline workspace."""
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        content = await file.read(MAX_RESPONSE_BYTES + 1)
+        if len(content) > MAX_RESPONSE_BYTES:
+            raise HTTPException(status_code=413, detail="Response PDF must be 10 MB or smaller.")
+        if not content.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Response file must be a PDF.")
+        response_dir = safe_join(Path(__file__).resolve().parent / "uploads" / "responses", upload_id)
+        response_dir.mkdir(parents=True, exist_ok=True)
+        stored_path = safe_join(response_dir, f"{uuid4()}.pdf")
+        stored_path.write_bytes(content)
+        digest = hashlib.sha256(content).hexdigest()
+        parsed = await run_in_threadpool(parse_response, stored_path)
+        return create_parsed_response(user_id, upload_id, digest, str(stored_path), requisitionId, parsed)
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail={"message": "This response PDF was already uploaded.", "responseId": int(str(exc))})
+    except HTTPException:
+        raise
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except Exception as exc:
+        print(f"[BANK RESPONSE PARSE ERROR] {exc}")
+        raise HTTPException(status_code=500, detail="Failed to parse bank response.")
+
+
+@app.get("/api/cases/{upload_id}/responses", status_code=status.HTTP_200_OK)
+def bank_response_history(request: Request, upload_id: str):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        return list_responses(user_id, upload_id)
+    except Exception as exc:
+        print(f"[BANK RESPONSE HISTORY ERROR] {exc}")
+        raise HTTPException(status_code=500, detail="Failed to load bank response history.")
+
+
+@app.patch("/api/cases/{upload_id}/responses/{response_id}/rows/{row_id}")
+def patch_bank_response_row(request: Request, upload_id: str, response_id: int, row_id: int, body: ResponseRowPatch):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        changes = dict(body.data)
+        if body.included is not None: changes["included"] = body.included
+        return update_row(user_id, upload_id, response_id, row_id, changes)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        print(f"[BANK RESPONSE ROW ERROR] {exc}")
+        raise HTTPException(status_code=500, detail="Failed to update bank response row.")
+
+
+@app.post("/api/cases/{upload_id}/responses/{response_id}/rows", status_code=status.HTTP_201_CREATED)
+def add_bank_response_row(request: Request, upload_id: str, response_id: int, body: ResponseRowCreate):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        return add_row(user_id, upload_id, response_id, body.tableName, body.data)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        print(f"[BANK RESPONSE ADD ROW ERROR] {exc}")
+        raise HTTPException(status_code=500, detail="Failed to add bank response row.")
+
+
+@app.post("/api/cases/{upload_id}/responses/{response_id}/apply", status_code=status.HTTP_200_OK)
+async def apply_bank_response(request: Request, upload_id: str, response_id: int, body: ApplyBankResponseRequest):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        annotation = body.annotation or None
+        if annotation and str(annotation.get("kind") or "") not in {"no_onward", "withdrawn", "lien_confirmed"}:
+            raise ValueError("Invalid annotation kind.")
+        result = await run_in_threadpool(
+            rebuild_case, user_id, upload_id, response_id, body.changeNote, annotation,
+            body.anchorNodeId, body.layerShift,
+        )
+        return {"revision": result["revision"], "newNodeCount": result["counts"]["newNodeCount"], "resolvedNodeCount": result["counts"]["resolvedNodeCount"], "newNodeIds": result["newNodeIds"], "resolvedNodeIds": result["resolvedNodeIds"], "warnings": result["warnings"]}
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        if str(exc) == "REBUILD_BUSY": raise HTTPException(status_code=409, detail="A rebuild is already in progress.")
+        if str(exc) == "ALREADY_APPLIED": raise HTTPException(status_code=409, detail="This bank response has already been applied.")
+        if str(exc).startswith("REBUILD_NODE_COUNT_REGRESSION"):
+            print(f"[BANK RESPONSE APPLY ERROR] {exc}")
+            raise HTTPException(status_code=500, detail="Rebuilt graph unexpectedly has fewer transactions than the previous revision; no changes were saved.")
+        print(f"[BANK RESPONSE APPLY ERROR] {exc}"); raise HTTPException(status_code=500, detail="Failed to rebuild case graph.")
+    except Exception as exc:
+        print(f"[BANK RESPONSE APPLY ERROR] {exc}")
+        raise HTTPException(status_code=500, detail="Failed to rebuild case graph.")
+
+
 @app.post("/api/cases/{upload_id}/requisitions/preview", status_code=status.HTTP_200_OK)
 def requisitions_preview(request: Request, upload_id: str, body: SinglePreviewRequest):
     user_id, upload_id = _auth_and_upload(request, upload_id)
@@ -504,17 +624,13 @@ def requisitions_send(request: Request, upload_id: str, body: SingleSendRequest)
         raise HTTPException(status_code=500, detail="Failed to send the email.")
 
 
-# @app.get("/api/cases/{upload_id}/requisitions", status_code=status.HTTP_200_OK)
-# def requisitions_list(request: Request, upload_id: str):
-#     """Sent / failed history for this case."""
-#     user_id, upload_id = _auth_and_upload(request, upload_id)
-#     try:
-#         return list_requisitions(user_id, upload_id)
-#     except PermissionError as e:
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-#     except Exception as e:
-#         print(f"[REQUISITION LIST ERROR] {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail="Failed to load requisition history.",
-#         )
+@app.get("/api/cases/{upload_id}/requisitions", status_code=status.HTTP_200_OK)
+def requisitions_list(request: Request, upload_id: str):
+    user_id, upload_id = _auth_and_upload(request, upload_id)
+    try:
+        return list_requisitions(user_id, upload_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except Exception as exc:
+        print(f"[REQUISITION LIST ERROR] {exc}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to load requisition history.")

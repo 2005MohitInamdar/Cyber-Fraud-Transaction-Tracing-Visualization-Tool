@@ -23,9 +23,17 @@ SELECT
             WHERE e.case_id = n.case_id AND e.from_node = n.node_id) AS has_child,
     EXISTS (SELECT 1 FROM hold_links h
             WHERE h.case_id = n.case_id AND h.node_id = n.node_id)   AS has_hold
+    , EXISTS (SELECT 1 FROM node_annotations a
+              WHERE a.upload_id = c.upload_id
+                AND a.supabase_user_id = c.supabase_user_id
+                AND a.node_id = n.node_id
+                AND a.case_revision <= c.revision
+                AND a.kind IN ('no_onward','withdrawn','lien_confirmed')) AS has_annotation
 FROM nodes n
 JOIN cases c ON c.id = n.case_id
 WHERE c.upload_id = %s AND c.supabase_user_id = %s
+  AND c.revision = (SELECT MAX(c2.revision) FROM cases c2
+                    WHERE c2.upload_id = c.upload_id AND c2.supabase_user_id = c.supabase_user_id)
 ORDER BY n.layer, n.account_no, n.utr
 """
 
@@ -34,6 +42,8 @@ SELECT h.hold_id, h.account_no, h.hold_amount, h.hold_date, h.action_taken_by
 FROM holds h
 JOIN cases c ON c.id = h.case_id
 WHERE c.upload_id = %s AND c.supabase_user_id = %s
+  AND c.revision = (SELECT MAX(c2.revision) FROM cases c2
+                    WHERE c2.upload_id = c.upload_id AND c2.supabase_user_id = c.supabase_user_id)
   AND NOT EXISTS (SELECT 1 FROM hold_links hl
                   WHERE hl.case_id = h.case_id AND hl.hold_id = h.hold_id)
 ORDER BY h.hold_date, h.account_no
@@ -52,9 +62,9 @@ def _reasons_for_node(row: dict[str, Any]) -> list[dict[str, str]]:
         if not row["has_parent"]:
             codes.append("NO_INCOMING_LINK")
         # End of trail: has a parent, passes nothing on, no hold recorded
-        elif not row["has_child"] and not row["has_hold"]:
+        elif not row["has_child"] and not row["has_hold"] and not row["has_annotation"]:
             codes.append("END_NO_STATUS")
-        if (row["unaccounted_amount"] or 0) > 0:
+        if (row["unaccounted_amount"] or 0) > 0 and not (row["has_annotation"] and not row["has_child"]):
             codes.append("UNACCOUNTED_AMOUNT")
 
     if row["amount_estimated"]:

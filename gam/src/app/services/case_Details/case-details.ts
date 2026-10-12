@@ -96,6 +96,8 @@ export interface CaseGraphNode {
   role: 'victim' | 'intermediate' | 'endOfTrail' | 'isolated';
   holds: CaseGraphHold[];
   completeness?: NodeCompleteness;
+  addedInRevision?: number;
+  fromBankResponse?: boolean;
 }
 
 export interface CaseGraphEdge {
@@ -111,6 +113,8 @@ export interface CaseGraphEdge {
 
 export interface CaseGraph {
   hasGraph: boolean;
+  revision?: number;
+  revisions?: { revision: number; createdAt: string | null; changeNote: string | null }[];
   summary: {
     ackNo: string | null;
     status: string | null;
@@ -132,6 +136,37 @@ export interface CaseGraph {
   orphanHolds?: IncompleteItem[];
 }
 
+export interface BankResponseParseResult {
+  responseId: number;
+  format: 'ncrp_table' | 'unknown';
+  confidence: 'high' | 'medium' | 'low';
+  warnings: string[];
+  lienRows?: Record<string, unknown>[];
+  holdRows?: Record<string, unknown>[];
+  rows?: BankResponseRow[];
+  anchorCandidates?: { nodeId: string; bank: string; layer: number; incomplete: boolean; score: number }[];
+  suggestedAnchorNodeId?: string | null;
+  suggestedLayerShift?: number;
+}
+
+export interface BankResponseRow {
+  id: number;
+  table: 'lien_transactions' | 'hold_accounts';
+  data: Record<string, unknown>;
+  isDuplicate: boolean;
+  duplicateReason?: string | null;
+  included: boolean;
+}
+
+export interface BankResponseApplyResult {
+  revision: number;
+  newNodeCount: number;
+  resolvedNodeCount: number;
+  newNodeIds: string[];
+  resolvedNodeIds: string[];
+  warnings: string[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -142,8 +177,40 @@ export class Case_Details {
       return this.http.get<CaseDetail>(`${environment.apiBaseUrl}/api/cases/${uploadId}`);
     }
 
-    getCaseGraph(uploadId: string): Observable<CaseGraph> {
-      return this.http.get<CaseGraph>(`${environment.apiBaseUrl}/api/cases/${uploadId}/graph`);
+    getCaseGraph(uploadId: string, revision?: number): Observable<CaseGraph> {
+      const suffix = revision == null ? '' : `?revision=${encodeURIComponent(revision)}`;
+      return this.http.get<CaseGraph>(`${environment.apiBaseUrl}/api/cases/${uploadId}/graph${suffix}`);
+    }
+
+    parseBankResponse(uploadId: string, file: File, requisitionId?: number): Observable<BankResponseParseResult> {
+      const form = new FormData();
+      form.append('file', file);
+      if (requisitionId != null) form.append('requisitionId', String(requisitionId));
+      return this.http.post<BankResponseParseResult>(`${environment.apiBaseUrl}/api/cases/${uploadId}/responses/parse`, form);
+    }
+
+    updateResponseRow(uploadId: string, responseId: number, rowId: number, data: Record<string, unknown>, included?: boolean): Observable<unknown> {
+      return this.http.patch(`${environment.apiBaseUrl}/api/cases/${uploadId}/responses/${responseId}/rows/${rowId}`, { data, included });
+    }
+
+    listBankResponses(uploadId: string): Observable<{ responses: unknown[] }> {
+      return this.http.get<{ responses: unknown[] }>(`${environment.apiBaseUrl}/api/cases/${uploadId}/responses`);
+    }
+
+    getUploadProgress(uploadId: string): Observable<{ events: { message: string; state: string; at: string }[] }> {
+      return this.http.get<{ events: { message: string; state: string; at: string }[] }>(`${environment.apiBaseUrl}/api/uploads/${uploadId}/progress`);
+    }
+
+    listRequisitions(uploadId: string): Observable<{ history: { id: number; bankName: string; status: string; sentAt: string | null }[] }> {
+      return this.http.get<{ history: { id: number; bankName: string; status: string; sentAt: string | null }[] }>(`${environment.apiBaseUrl}/api/cases/${uploadId}/requisitions`);
+    }
+
+    addResponseRow(uploadId: string, responseId: number, tableName: 'lien_transactions' | 'hold_accounts', data: Record<string, unknown>): Observable<BankResponseRow> {
+      return this.http.post<BankResponseRow>(`${environment.apiBaseUrl}/api/cases/${uploadId}/responses/${responseId}/rows`, { tableName, data });
+    }
+
+    applyBankResponse(uploadId: string, responseId: number, body: { anchorNodeId?: string; layerShift?: number; annotation?: { nodeId: string; kind: string; note?: string }; changeNote?: string }): Observable<BankResponseApplyResult> {
+      return this.http.post<BankResponseApplyResult>(`${environment.apiBaseUrl}/api/cases/${uploadId}/responses/${responseId}/apply`, body);
     }
 
     sendReportEmail(uploadId: string): Observable<{ message: string; subject: string }> {

@@ -5,11 +5,12 @@ import { CaseDetail, Case_Details, CaseGraph } from '../../services/case_Details
 import { SearhedSQL } from '../searhed-sql/searhed-sql';
 import { CaseGraphNew } from '../case-graph-new/case-graph-new'; 
 import { IncompleteNodesComponent } from '../incomplete-nodes/incomplete-nodes';
+import { BankResponseReview } from '../bank-response-review/bank-response-review';
 
 @Component({
   selector: 'app-case-details',
   standalone:true,
-  imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew, IncompleteNodesComponent],
+  imports: [CommonModule, RouterLink, SearhedSQL, CaseGraphNew, IncompleteNodesComponent, BankResponseReview],
   templateUrl: './case-details.html',
   styleUrls: ['./case-details.scss'],
 })
@@ -116,5 +117,20 @@ export class CaseDetails implements OnInit {
   focusIncompleteNode(nodeId: string): void {
     this.focusId.set(null);
     queueMicrotask(() => this.focusId.set(nodeId));
+  }
+
+  loadGraph(revision?: number): void {
+    const uploadId = this.route.snapshot.paramMap.get('uploadId');
+    if (!uploadId) return;
+    this.isGraphLoading.set(true);
+    this.caseDetailService.getCaseGraph(uploadId, revision).subscribe({
+      next: graph => { this.graph.set(graph); this.isGraphLoading.set(false); this.graphError.set(false); },
+      error: () => { this.graphError.set(true); this.isGraphLoading.set(false); },
+    });
+  }
+
+  selectRevision(event: Event): void {
+    const revision = Number((event.target as HTMLSelectElement).value);
+    this.loadGraph(Number.isFinite(revision) ? revision : undefined);
   }
 }

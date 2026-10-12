@@ -532,6 +532,8 @@ export class CaseGraphNew implements AfterViewInit, OnDestroy {
       ['Frozen amount', this.amount(n.frozenAmount)],
       ['Action taken by', n.actionTakenBy],
       ['Remarks', n.remarks],
+      ['Added in revision', n.addedInRevision != null && n.addedInRevision > 1 ? String(n.addedInRevision) : null],
+      ['Source', n.fromBankResponse ? 'Bank response' : null],
     ];
 
     const status = n.completeness?.status === 'incomplete'

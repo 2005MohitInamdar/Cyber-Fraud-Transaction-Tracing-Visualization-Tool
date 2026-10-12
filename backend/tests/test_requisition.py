@@ -18,8 +18,8 @@ import pytest
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-from backend.services.email.bank_names import normalize_bank_name
-from backend.services.email.collect import collect_requisition_items, ACTIONABLE_CODES
+from services.email.bank_names import normalize_bank_name
+from services.email.collect import collect_requisition_items, ACTIONABLE_CODES
 from services.email.template import build_email
 import services.email.mailer as mailer_module
 

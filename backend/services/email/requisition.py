@@ -24,7 +24,7 @@ def get_case_meta(user_id: str, upload_id: str) -> tuple[str, dict]:
     with get_connection() as conn:
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
-                "SELECT ack_no FROM cases WHERE upload_id=%s AND supabase_user_id=%s LIMIT 1",
+                "SELECT ack_no FROM cases WHERE upload_id=%s AND supabase_user_id=%s ORDER BY revision DESC LIMIT 1",
                 (upload_id, user_id),
             )
             case = cur.fetchone() or {}

@@ -252,6 +252,9 @@ def _build_node(key: tuple[Any, ...], members: list[tuple[str, dict[str, Any]]],
         "primary": primary, "secondary": embedded, "roots": roots,
         "ids": embedded | ({primary} if primary else set()),
         "remarks": remarks, "frozen": ZERO, "hold_ids": [],
+        # Bank response review may nominate an authoritative parent. It is
+        # intentionally excluded from the grouping key so source identity stays stable.
+        "explicit_parent": next((row.get("explicit_parent") for row in rows if row.get("explicit_parent")), None),
     }
 
 
@@ -414,8 +417,24 @@ def _split_assign(parents: list[dict[str, Any]], children: list[dict[str, Any]],
 def _link_layers(parents: list[dict[str, Any]], children: list[dict[str, Any]], st: _State, ctx: _Ctx) -> None:
     cfg = ctx.cfg
 
+    # 0. A reviewed bank response can state the parent explicitly. This is
+    # authoritative even where its value exceeds the inferred parent budget.
+    for child in children:
+        explicit = child.get("explicit_parent")
+        if not explicit:
+            continue
+        requested_id = explicit.get("nodeId") if isinstance(explicit, dict) else str(explicit)
+        requested_utr = explicit.get("utr") if isinstance(explicit, dict) else None
+        parent = next((item for item in parents if item["id"] == requested_id or (requested_utr and item.get("primary") == requested_utr)), None)
+        if parent:
+            st.add(parent, child, "bank_response_explicit", 1.0)
+        else:
+            st.rejected.append({"from": str(requested_id or requested_utr), "to": child["id"], "reason": "explicit_parent_not_found"})
+
     # 1. same id (exact), preferring a parent whose bank also agrees
     for child in children:
+        if st.parent_of[child["id"]]:
+            continue
         found = [(p, rule) for p in parents if (rule := _exact_id_rule(p, child)) and _can_assign(p, child, st.used, cfg)]
         if found:
             parent, rule = min(found, key=lambda item: (not _bank_match(item[0], child, cfg)[0], item[0]["id"]))

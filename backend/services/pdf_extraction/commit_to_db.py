@@ -9,9 +9,10 @@ Pipeline:  schema_mapping.py  ->  <db_schema_dir>/*.json
 
 load_all() builds transaction_flow.json from the mapped JSON files (rebuild=True by
 default, so it can never be stale), then inserts one case inside ONE transaction: either the whole
-case is saved or nothing is. The flow goes into the new tables; the mapped rows are ALSO written to
-the original per-section tables (amount_summary, lien_transactions, ...) so the existing case-detail
-page keeps working (legacy_tables=True; columns the old tables don't have are skipped). Plain parameterized INSERTs only - no CREATE TABLE,
+case is saved or nothing is. The flow and the mapped source payloads go into the new tables;
+mapped rows are ALSO written to the optional original per-section tables (amount_summary,
+lien_transactions, ...) for older case-detail readers (legacy_tables=True; columns the old tables
+don't have are skipped). Plain parameterized INSERTs only - no CREATE TABLE,
 no TRUNCATE, no ON DUPLICATE KEY UPDATE. The tables must already exist
 (run the DDL, then the cases-table migration below).
 
@@ -238,6 +239,22 @@ def _read_legacy_payloads(directory: Path) -> dict[str, dict[str, Any]]:
     return payloads
 
 
+def _read_source_payloads(directory: Path) -> dict[str, dict[str, Any]]:
+    """Read every mapped section for durable rebuilds, excluding generated artifacts."""
+    payloads: dict[str, dict[str, Any]] = {}
+    for path in sorted(directory.glob("*.json")):
+        if path.name in {"transaction_flow.json", "no_transaction_records.json"}:
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        table = payload.get("table") if isinstance(payload, dict) else None
+        if isinstance(table, str) and table and table not in payloads:
+            payloads[table] = payload
+    return payloads
+
+
 def _table_columns(cursor, table: str) -> set[str]:
     cursor.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS "
                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s", (table,))
@@ -307,6 +324,7 @@ def load_all(user_id: str, upload_id: str, db_schema_dir: str | Path,
         return {"transaction_flow": f"FAILED: {exc}"}
 
     extras, meta = _read_extras(directory)
+    source_payloads = _read_source_payloads(directory)
     checks = flow.get("checks", {})
     case_row = (user_id, upload_id, _pick_ack(meta, ack_no), meta.get("current_status"),
                 _dec(checks.get("baseDebitTotal")), _dec(checks.get("reportedFraudTotal")),
@@ -320,11 +338,18 @@ def load_all(user_id: str, upload_id: str, db_schema_dir: str | Path,
     try:
         if replace:                                        # ON DELETE CASCADE clears the child rows
             cursor.execute("DELETE FROM `cases` WHERE `upload_id` = %s", (upload_id,))
+            cursor.execute("DELETE FROM `case_source_payloads` WHERE `upload_id` = %s", (upload_id,))
             if legacy_tables:
                 _delete_legacy(cursor, user_id, upload_id)
         cursor.execute(build_row_insert("cases", CASE_COLUMNS), case_row)
         case_id = cursor.lastrowid
         results["cases"] = 1
+
+        cursor.executemany(
+            "INSERT INTO `case_source_payloads` (upload_id,supabase_user_id,table_name,payload) VALUES (%s,%s,%s,%s)",
+            [(upload_id, user_id, table, _json(payload)) for table, payload in source_payloads.items()],
+        )
+        results["case_source_payloads"] = len(source_payloads)
 
         for step, columns, rows in (                       # parents before children (foreign keys)
             ("nodes", NODE_COLUMNS, _node_rows(case_id, flow)),

@@ -1,0 +1,28 @@
+<button class="response-button" type="button" (click)="show()" [disabled]="graph?.revision !== undefined && graph?.revision !== graph?.revisions?.[0]?.revision">Upload bank response</button>
+<div class="overlay" *ngIf="open()" role="dialog" aria-modal="true" aria-label="Review bank response">
+  <section class="dialog">
+    <button class="close" type="button" (click)="close()" [disabled]="busy()" aria-label="Close">×</button>
+    <h2>Bank response</h2>
+    <p class="error" *ngIf="error()">{{ error() }}</p>
+    <ng-container [ngSwitch]="stage()">
+      <div *ngSwitchCase="1"><p>Upload the bank's PDF response for review. It will not change the case until you apply it.</p><label>Replying to (optional) <select [value]="requisitionId()" (change)="requisitionId.set($any($event.target).value)"><option value="">Select a sent request</option><option *ngFor="let item of requisitions()" [value]="item.id">{{ item.bankName }} · {{ item.sentAt | date:'mediumDate' }}</option></select></label><input type="file" accept="application/pdf" (change)="chooseFile($event)" [disabled]="busy()"><p *ngIf="busy()">Extracting response tables…</p></div>
+      <div *ngSwitchCase="2">
+        <p>Confidence: <strong>{{ result()?.confidence }}</strong></p><p *ngFor="let warning of result()?.warnings">{{ warning }}</p>
+        <label>Anchor transaction <select [value]="anchor()" (change)="setAnchor($event)"><option value="">No anchor</option><option *ngFor="let candidate of result()?.anchorCandidates" [value]="candidate.nodeId">{{ candidate.incomplete ? 'Incomplete · ' : '' }}Layer {{ candidate.layer }} · {{ candidate.bank || candidate.nodeId }}</option><option *ngFor="let node of otherAnchorNodes()" [value]="node.id">Layer {{ node.layer }} · {{ node.bank || node.id }}</option></select></label>
+        <label>Layer shift <input type="number" [value]="shift()" (input)="shift.set(+$any($event.target).value || 0)"></label><p>{{ preview() }}</p>
+        <h3>Lien transactions ({{ rowsFor('lien_transactions').length }})</h3>
+        <div class="rows"><div class="row" *ngFor="let row of rowsFor('lien_transactions')" [class.duplicate]="row.isDuplicate"><input type="checkbox" [checked]="row.included" [disabled]="row.isDuplicate" (change)="toggle(row)"><span class="row-fields"><input *ngFor="let field of fields(row)" [attr.aria-label]="field" [placeholder]="field" [value]="row.data[field] ?? ''" [disabled]="row.isDuplicate" (change)="editField(row, field, $event)"></span><small *ngIf="row.isDuplicate">Duplicate: {{ row.duplicateReason }}</small></div></div>
+        <button type="button" (click)="addRow('lien_transactions')">Add lien row</button>
+        <h3>Hold accounts ({{ rowsFor('hold_accounts').length }})</h3>
+        <div class="rows"><div class="row" *ngFor="let row of rowsFor('hold_accounts')" [class.duplicate]="row.isDuplicate"><input type="checkbox" [checked]="row.included" [disabled]="row.isDuplicate" (change)="toggle(row)"><span class="row-fields"><input *ngFor="let field of fields(row)" [attr.aria-label]="field" [placeholder]="field" [value]="row.data[field] ?? ''" [disabled]="row.isDuplicate" (change)="editField(row, field, $event)"></span><small *ngIf="row.isDuplicate">Duplicate: {{ row.duplicateReason }}</small></div></div>
+        <button type="button" (click)="addRow('hold_accounts')">Add hold row</button>
+        <label><input type="checkbox" [checked]="annotation()" (change)="annotation.set($any($event.target).checked)"> Bank states no onward transactions</label>
+        <label *ngIf="annotation()">Transaction <select (change)="setAnnotationNode($event)"><option value="">Choose transaction</option><option *ngFor="let node of graph?.nodes" [value]="node.id">Layer {{ node.layer }} · {{ node.bank || node.id }}</option></select></label>
+        <label *ngIf="annotation()">Note <input [value]="annotationNote()" (input)="annotationNote.set($any($event.target).value)"></label>
+        <button class="apply" type="button" (click)="reviewComplete()" [disabled]="busy()">Continue to confirmation</button>
+      </div>
+      <div *ngSwitchCase="3"><p>Apply {{ selectedCount() }} selected response row(s) and rebuild the transaction graph as a new revision?</p><p>{{ preview() }}</p><button class="apply" type="button" (click)="apply()" [disabled]="busy() || (!selectedCount() && !annotation()) || (annotation() && !annotationNode())">{{ busy() ? progressMessage() : 'Apply and rebuild' }}</button></div>
+      <div *ngSwitchCase="4"><p>The response was applied as a new case revision.</p><button type="button" (click)="close()">Done</button></div>
+    </ng-container>
+  </section>
+</div>

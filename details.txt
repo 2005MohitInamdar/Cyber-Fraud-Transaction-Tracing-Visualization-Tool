@@ -1,0 +1,125 @@
+# ABC BANK LIMITED
+### Cyber Crime Investigation – Additional Transaction Details
+
+**Confidential – For Official Use Only**
+
+**Reference Details**
+
+| Field | Details |
+|---|---|
+| Police Station | Cyber Crime Police Station, Pune |
+| Cyber Crime Complaint No. | NCRP/2026/001234 |
+| Bank Reference No. | CYBER/REQ/2026/45821 |
+| Police Request Date | 10-Oct-2026 |
+| Bank Response Date | 11-Oct-2026 |
+| Account Number | XXXXXXXX4521 |
+| Account Holder | RAHUL XXXXX |
+| Transaction Type | UPI |
+
+### Subject: Additional Transaction Details
+
+With reference to the request received from the Cyber Crime Police Station regarding the above-mentioned complaint, the following additional transaction details are provided from the bank's available records.
+
+## Additional Transactions
+
+| Sr. No. | Date | Time | UTR / Transaction ID | Type | Amount | Dr/Cr | Status |
+|---:|---|---|---|---|---:|---|---|
+| 1 | 08-Oct-2026 | 10:32:14 | 623456789012 | UPI | ₹25,000 | Debit | SUCCESS |
+| 2 | 08-Oct-2026 | 10:36:51 | 623456789013 | UPI | ₹15,000 | Debit | SUCCESS |
+| 3 | 08-Oct-2026 | 10:41:07 | 623456789014 | UPI | ₹10,000 | Debit | SUCCESS |
+
+## Transaction Details
+
+### Transaction 1
+
+**Transaction Date:** 08-Oct-2026  
+**Transaction Time:** 10:32:14  
+**UTR / Transaction Reference:** 623456789012  
+**Transaction Type:** UPI  
+**Amount:** ₹25,000  
+**Status:** SUCCESS  
+
+**Remitter Account:** XXXXXXXX4521  
+**Remitter Name:** RAHUL XXXXX  
+**Remitter Bank:** ABC Bank  
+
+**Beneficiary Account:** XXXXXXXX7812  
+**Beneficiary Name:** AMIT XXXXX  
+**Beneficiary Bank:** XYZ Bank  
+**Beneficiary UPI ID:** amitxxxx@upi  
+
+**Narration:** UPI/623456789012/AMITXXXXX
+
+---
+
+### Transaction 2
+
+**Transaction Date:** 08-Oct-2026  
+**Transaction Time:** 10:36:51  
+**UTR / Transaction Reference:** 623456789013  
+**Transaction Type:** UPI  
+**Amount:** ₹15,000  
+**Status:** SUCCESS  
+
+**Remitter Account:** XXXXXXXX7812  
+**Remitter Name:** AMIT XXXXX  
+**Remitter Bank:** XYZ Bank  
+
+**Beneficiary Account:** XXXXXXXX3490  
+**Beneficiary Name:** RAVI XXXXX  
+**Beneficiary Bank:** PQR Bank  
+**Beneficiary UPI ID:** ravixxxx@upi  
+
+**Narration:** UPI/623456789013/RAVIXXXXX
+
+---
+
+### Transaction 3
+
+**Transaction Date:** 08-Oct-2026  
+**Transaction Time:** 10:41:07  
+**UTR / Transaction Reference:** 623456789014  
+**Transaction Type:** UPI  
+**Amount:** ₹10,000  
+**Status:** SUCCESS  
+
+**Remitter Account:** XXXXXXXX3490  
+**Remitter Name:** RAVI XXXXX  
+**Remitter Bank:** PQR Bank  
+
+**Beneficiary Account:** XXXXXXXX9021  
+**Beneficiary Name:** SANJAY XXXXX  
+**Beneficiary Bank:** LMN Bank  
+**Beneficiary UPI ID:** sanjayxxxx@upi  
+
+**Narration:** UPI/623456789014/SANJAYXXXXX
+
+---
+
+## Transaction Flow Identified
+
+**RAHUL XXXXX**  
+`₹25,000`  
+↓  
+**AMIT XXXXX**  
+`₹15,000`  
+↓  
+**RAVI XXXXX**  
+`₹10,000`  
+↓  
+**SANJAY XXXXX**
+
+The above transactions are provided in response to the request for additional/missing transaction details.
+
+### Bank Certification
+
+The information contained in this document has been extracted from the bank's transaction records available for the specified account and period.
+
+**For ABC BANK LIMITED**
+
+Authorized Officer  
+Cyber Crime / Law Enforcement Response Cell  
+
+Date: 11-Oct-2026
+
+**End of Report**

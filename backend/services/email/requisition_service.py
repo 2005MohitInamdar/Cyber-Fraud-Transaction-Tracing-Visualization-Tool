@@ -85,7 +85,7 @@ def _case_meta(user_id: str, upload_id: str, ack_override: str | None) -> tuple[
             if off is None:
                 raise PermissionError("You do not have access to this case.")
             cur.execute(
-                "SELECT ack_no FROM cases WHERE upload_id=%s AND supabase_user_id=%s LIMIT 1",
+                "SELECT ack_no FROM cases WHERE upload_id=%s AND supabase_user_id=%s ORDER BY revision DESC LIMIT 1",
                 (upload_id, user_id),
             )
             case = cur.fetchone() or {}
@@ -139,13 +139,14 @@ def list_requisitions(user_id: str, upload_id: str) -> dict[str, Any]:
     with get_connection() as conn:
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
-                "SELECT bank_name, to_emails, delivered_to, status, sent_at, "
+                "SELECT id, bank_name, to_emails, delivered_to, status, sent_at, "
                 "error_message, test_mode, created_at FROM requisitions "
                 "WHERE upload_id=%s AND supabase_user_id=%s ORDER BY id DESC",
                 (upload_id, user_id),
             )
             rows = cur.fetchall()
     return {"history": [{
+        "id":          r["id"],
         "bankName":    r["bank_name"],
         "to":          json.loads(r["to_emails"]) if isinstance(r["to_emails"], str) else r["to_emails"],
         "deliveredTo": r["delivered_to"],

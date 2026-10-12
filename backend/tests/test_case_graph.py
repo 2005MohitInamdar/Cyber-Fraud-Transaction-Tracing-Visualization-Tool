@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from services.caseGraph.graph import build_graph_payload
+from services.caseGraph.graph import _first_revision_by_node, build_graph_payload
 
 
 def _node(node_id, layer, amount=100, **extra):
@@ -71,3 +71,24 @@ def test_old_callers_without_pending_rows_remain_supported() -> None:
     graph = build_graph_payload({"ack_no": "ACK"}, [], [], [], [])
     assert graph["hasGraph"] is True
     assert graph["incomplete"] == []
+
+
+def test_added_revision_is_first_revision_node_id_appears() -> None:
+    # The existing node is persisted again in revision 2; only the new node
+    # should be marked as added in that revision.
+    added_revisions = _first_revision_by_node([
+        {"node_id": "existing", "revision": 1},
+        {"node_id": "existing", "revision": 2},
+        {"node_id": "new", "revision": 2},
+    ])
+    graph = build_graph_payload(
+        {"ack_no": "ACK", "revision": 2},
+        [_node("existing", 0), _node("new", 1)],
+        [], [], [],
+        added_revisions=added_revisions,
+    )
+
+    assert {node["id"]: node["addedInRevision"] for node in graph["nodes"]} == {
+        "existing": 1,
+        "new": 2,
+    }

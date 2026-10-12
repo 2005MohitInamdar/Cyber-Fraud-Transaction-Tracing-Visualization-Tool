@@ -16,7 +16,7 @@ _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def _cache_key(upload_id: str) -> str:
-    return f"case:{upload_id}:graph:v2"
+    return f"case:{upload_id}:graph:v3"
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -47,6 +47,20 @@ def _boolean(value: Any) -> bool:
     return value.strip().lower() in {"1", "true", "yes"} if isinstance(value, str) else bool(value)
 
 
+def _first_revision_by_node(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Return the earliest case revision in which each node id appears."""
+    first_revisions: dict[str, int] = {}
+    for row in rows:
+        node_id = row.get("node_id")
+        revision = row.get("revision")
+        if node_id is None or revision is None:
+            continue
+        revision_number = int(revision)
+        key = str(node_id)
+        first_revisions[key] = min(revision_number, first_revisions.get(key, revision_number))
+    return first_revisions
+
+
 def _bank_tokens(value: Any) -> frozenset[str]:
     """Exact full-bank matching after lowercasing and stripping punctuation."""
     return frozenset(re.findall(r"[\w]+", str(value or "").lower()))
@@ -75,12 +89,16 @@ def build_graph_payload(
     hold_rows: list[dict[str, Any]],
     hold_link_rows: list[dict[str, Any]],
     pending_rows: list[dict[str, Any]] | None = None,
+    annotations: list[dict[str, Any]] | None = None,
+    added_revisions: dict[str, int] | None = None,
+    revisions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return a deterministic, JSON-ready graph without database I/O."""
     if case_row is None:
         return {"hasGraph": False, "summary": _empty_summary(), "nodes": [], "edges": [], "incomplete": [], "orphanHolds": []}
 
     pending_banks = {_bank_tokens(row.get("bank")) for row in (pending_rows or []) if _bank_tokens(row.get("bank"))}
+    annotations_by_node = {str(row.get("node_id")): row for row in (annotations or [])}
     node_ids = {row.get("node_id") for row in node_rows if row.get("node_id")}
     holds = {row.get("hold_id"): row for row in hold_rows if row.get("hold_id")}
     holds_by_node: dict[str, list[dict[str, Any]]] = {}
@@ -127,13 +145,15 @@ def build_graph_payload(
         bank_tokens = _bank_tokens(row.get("bank"))
         has_pending = bool(bank_tokens) and bank_tokens in pending_banks
         has_withdrawal_note = _withdrawal_note(row.get("remarks"))
-        resolved_by = "hold" if has_hold else ("pending" if has_pending and not outgoing else ("withdrawal_note" if has_withdrawal_note and not outgoing else None))
+        annotation = annotations_by_node.get(node_id)
+        annotation_resolves = annotation and annotation.get("kind") in {"no_onward", "withdrawn", "lien_confirmed"} and not outgoing
+        resolved_by = "hold" if has_hold else ("pending" if has_pending and not outgoing else ("withdrawal_note" if has_withdrawal_note and not outgoing else (annotation.get("kind") if annotation_resolves else None)))
 
         reasons: list[dict[str, str]] = []
-        end_without_status = layer > 0 and bool(incoming) and not outgoing and not (has_hold or has_pending or has_withdrawal_note)
+        end_without_status = layer > 0 and bool(incoming) and not outgoing and not (has_hold or has_pending or has_withdrawal_note or annotation_resolves)
         if end_without_status:
             reasons.append(_reason("END_NO_STATUS", "Money reached this account but nothing shows where it went (no hold, pending record or withdrawal note).", "high"))
-        if remaining > UNACCOUNTED_TOLERANCE and not end_without_status and not (has_pending or has_withdrawal_note):
+        if remaining > UNACCOUNTED_TOLERANCE and not end_without_status and not (has_pending or has_withdrawal_note or annotation_resolves):
             reasons.append(_reason("UNACCOUNTED_AMOUNT", f"₹{remaining:,.2f} is unaccounted for after matched transfers and frozen funds.", "medium"))
         if layer > 0 and not incoming:
             reasons.append(_reason("NO_INCOMING_LINK", "No earlier transaction could be matched to this one.", "high"))
@@ -151,7 +171,8 @@ def build_graph_payload(
         severity = min((reason["severity"] for reason in reasons), key=lambda value: _SEVERITY_ORDER[value], default=None)
         completeness = {"status": "incomplete" if reasons else "complete", "reasons": [{"code": r["code"], "message": r["message"]} for r in reasons], "resolvedBy": resolved_by}
         role = "victim" if layer == 0 else ("isolated" if not incoming and not outgoing else ("endOfTrail" if incoming and not outgoing else "intermediate"))
-        node = {"id": node_id, "layer": layer, "bank": row.get("bank") or "", "actionTakenBy": row.get("action_taken_by") or "", "accountNo": row.get("account_no") or "", "utr": row.get("utr") or "", "txAmount": tx_amount, "disputedAmount": disputed_amount, "amountEstimated": _boolean(row.get("amount_estimated")), "frozenAmount": frozen_amount, "unaccountedAmount": _number(row.get("unaccounted_amount")), "embeddedIds": _as_list(row.get("embedded_ids")), "rootIds": _as_list(row.get("root_ids")), "remarks": row.get("remarks") or "", "role": role, "holds": linked_holds, "completeness": completeness}
+        added_in_revision = (added_revisions or {}).get(node_id, int(case_row.get("revision") or 1))
+        node = {"id": node_id, "layer": layer, "bank": row.get("bank") or "", "actionTakenBy": row.get("action_taken_by") or "", "accountNo": row.get("account_no") or "", "utr": row.get("utr") or "", "txAmount": tx_amount, "disputedAmount": disputed_amount, "amountEstimated": _boolean(row.get("amount_estimated")), "frozenAmount": frozen_amount, "unaccountedAmount": _number(row.get("unaccounted_amount")), "embeddedIds": _as_list(row.get("embedded_ids")), "rootIds": _as_list(row.get("root_ids")), "remarks": row.get("remarks") or "", "role": role, "holds": linked_holds, "completeness": completeness, "addedInRevision": added_in_revision, "fromBankResponse": added_in_revision > 1}
         nodes.append(node)
         if reasons:
             incomplete.append({"kind": "node", "nodeId": node_id, "layer": layer, "bank": node["bank"], "accountNo": node["accountNo"], "utr": node["utr"], "disputedAmount": disputed_amount, "txAmount": tx_amount, "unaccountedAmount": max(remaining, 0.0), "severity": severity, "reasons": completeness["reasons"]})
@@ -160,20 +181,24 @@ def build_graph_payload(
     orphan_holds = [{"kind": "hold", "holdId": hold_id, "accountNo": hold.get("account_no") or "", "amount": _number(hold.get("hold_amount")), "date": _json_value(hold.get("hold_date")), "actionTakenBy": hold.get("action_taken_by") or "", "remarks": hold.get("remarks") or "", "severity": "medium", "reasons": [{"code": "HOLD_WITHOUT_TRAIL", "message": "This frozen/held account could not be matched to a transaction trail."}]} for hold_id, hold in holds.items() if hold_id not in linked_hold_ids]
     nodes.sort(key=lambda node: (node["layer"], node["id"])); edges.sort(key=lambda edge: (edge["source"], edge["target"])); incomplete.sort(key=lambda item: (_SEVERITY_ORDER[item["severity"]], item["layer"], item["nodeId"])); orphan_holds.sort(key=lambda item: item["holdId"])
     layers = sorted({node["layer"] for node in nodes})
-    return {"hasGraph": True, "summary": {"ackNo": case_row.get("ack_no"), "status": case_row.get("status"), "baseDebitTotal": _number(case_row.get("base_debit_total")), "reportedFraudTotal": _number(case_row.get("reported_fraud_total")), "holdTotal": _number(case_row.get("hold_total")), "reportedLienTotal": _number(case_row.get("reported_lien_total")), "holdsMatchLien": _boolean(case_row.get("holds_match_lien")), "nodeCount": len(nodes), "edgeCount": len(edges), "layers": layers, "unmatchedHoldCount": len(orphan_holds), "incompleteCount": len(incomplete), "orphanHoldCount": len(orphan_holds)}, "nodes": nodes, "edges": edges, "incomplete": incomplete, "orphanHolds": orphan_holds}
+    return {"hasGraph": True, "revision": case_row.get("revision"), "revisions": revisions or [], "summary": {"ackNo": case_row.get("ack_no"), "status": case_row.get("status"), "baseDebitTotal": _number(case_row.get("base_debit_total")), "reportedFraudTotal": _number(case_row.get("reported_fraud_total")), "holdTotal": _number(case_row.get("hold_total")), "reportedLienTotal": _number(case_row.get("reported_lien_total")), "holdsMatchLien": _boolean(case_row.get("holds_match_lien")), "nodeCount": len(nodes), "edgeCount": len(edges), "layers": layers, "unmatchedHoldCount": len(orphan_holds), "incompleteCount": len(incomplete), "orphanHoldCount": len(orphan_holds)}, "nodes": nodes, "edges": edges, "incomplete": incomplete, "orphanHolds": orphan_holds}
 
 
-def get_case_graph(user_id: str, upload_id: str) -> dict[str, Any]:
+def get_case_graph(user_id: str, upload_id: str, revision: int | None = None) -> dict[str, Any]:
     """Load one owned case graph, checking ownership before the shared cache."""
     with get_connection() as conn:
         with conn.cursor(dictionary=True) as cur:
             cur.execute("SELECT 1 FROM fraud_case_uploads WHERE upload_id = %s AND supabase_user_id = %s LIMIT 1", (upload_id, user_id))
             if cur.fetchone() is None:
                 raise PermissionError("You do not have access to this case.")
-            cached = get_redis().get(_cache_key(upload_id))
+            cache_key = f"{_cache_key(upload_id)}:r{revision}" if revision is not None else _cache_key(upload_id)
+            cached = get_redis().get(cache_key)
             if cached:
                 return json.loads(cached)
-            cur.execute("SELECT id, ack_no, status, base_debit_total, reported_fraud_total, hold_total, reported_lien_total, holds_match_lien FROM cases WHERE upload_id = %s AND supabase_user_id = %s LIMIT 1", (upload_id, user_id))
+            if revision is None:
+                cur.execute("SELECT id, revision, ack_no, status, base_debit_total, reported_fraud_total, hold_total, reported_lien_total, holds_match_lien FROM cases WHERE upload_id = %s AND supabase_user_id = %s ORDER BY revision DESC LIMIT 1", (upload_id, user_id))
+            else:
+                cur.execute("SELECT id, revision, ack_no, status, base_debit_total, reported_fraud_total, hold_total, reported_lien_total, holds_match_lien FROM cases WHERE upload_id = %s AND supabase_user_id = %s AND revision = %s LIMIT 1", (upload_id, user_id, revision))
             case_row = cur.fetchone()
             if case_row is None:
                 result = build_graph_payload(None, [], [], [], [])
@@ -187,6 +212,9 @@ def get_case_graph(user_id: str, upload_id: str) -> dict[str, Any]:
                 pending_rows: list[dict[str, Any]] = []
                 if cur.fetchone():
                     cur.execute("SELECT bank_fi AS bank, no_of_transactions_pending, amount_pending, pending_from FROM pending_transactions WHERE upload_id = %s AND supabase_user_id = %s", (upload_id, user_id)); pending_rows = cur.fetchall()
-                result = build_graph_payload(case_row, nodes, edges, holds, hold_links, pending_rows)
-    get_redis().set(_cache_key(upload_id), json.dumps(result), ex=_TTL_SECONDS)
+                cur.execute("SELECT node_id, kind, note FROM node_annotations WHERE upload_id=%s AND supabase_user_id=%s AND case_revision<=%s ORDER BY case_revision,id", (upload_id, user_id, case_row.get("revision") or 1)); annotations = cur.fetchall()
+                cur.execute("SELECT n.node_id, c.revision FROM nodes n JOIN cases c ON c.id=n.case_id WHERE c.upload_id=%s AND c.supabase_user_id=%s", (upload_id, user_id)); added_revisions = _first_revision_by_node(cur.fetchall())
+                cur.execute("SELECT revision, created_at, change_note FROM cases WHERE upload_id=%s AND supabase_user_id=%s ORDER BY revision DESC", (upload_id, user_id)); revisions = [{"revision": row["revision"], "createdAt": _json_value(row["created_at"]), "changeNote": row.get("change_note")} for row in cur.fetchall()]
+                result = build_graph_payload(case_row, nodes, edges, holds, hold_links, pending_rows, annotations, added_revisions, revisions)
+    get_redis().set(cache_key, json.dumps(result), ex=_TTL_SECONDS)
     return result

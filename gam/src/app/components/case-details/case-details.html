@@ -19,19 +19,22 @@
     </header>
     
     <!-- Request missing data from banks: opens the send-email page -->
-    <div class="report-email-action" *ngIf="incompleteCount() > 0">
-      <a class="send-report-btn"
-         [routerLink]="['/dashboard/cases', detail.uploadId, 'send-email']"
+    <div class="report-email-action">
+      <a class="send-report-btn" *ngIf="incompleteCount() > 0"
+         [routerLink]="graph()?.revision === graph()?.revisions?.[0]?.revision ? ['/dashboard/cases', detail.uploadId, 'send-email'] : null"
+         [class.disabled-link]="graph()?.revision !== graph()?.revisions?.[0]?.revision"
+         [attr.aria-disabled]="graph()?.revision !== graph()?.revisions?.[0]?.revision"
          [queryParams]="{ ackNo: prefillAckNo() }">
         Request missing data from banks ({{ incompleteCount() }})
       </a>
+      <app-bank-response-review *ngIf="graph() as caseGraph" [uploadId]="detail.uploadId" [graph]="caseGraph" (applied)="loadGraph()" />
     </div>
 
     <app-searhed-sql [uploadId]="detail.uploadId" (activeTabChange)="setActiveTab($event)" />
 
     <ng-container *ngIf="activeTab() === 'all'">
       <section class="data-section graph-section">
-        <h2>Transaction flow</h2>
+        <div class="graph-title"><h2>Transaction flow</h2><label *ngIf="graph()?.revisions?.length! > 1">Revision <select (change)="selectRevision($event)"><option *ngFor="let revision of graph()?.revisions" [value]="revision.revision" [selected]="revision.revision === graph()?.revision">{{ revision.revision }}</option></select></label></div>
         <p class="no-records" *ngIf="isGraphLoading()">Loading transaction flow…</p>
         <p class="state-message state-message--error" *ngIf="graphError()">Unable to load transaction flow.</p>
         <app-case-graph-new *ngIf="graph() as caseGraph" [graph]="caseGraph" [focusId]="focusId()" />

@@ -41,6 +41,7 @@ def invalidate_case_detail(upload_id: str) -> None:
         _cache_key(upload_id),
         f"case:{upload_id}:graph",
         f"case:{upload_id}:graph:v2",
+        f"case:{upload_id}:graph:v3",
     )
 
 
@@ -98,6 +99,7 @@ def _get_flow(cur, user_id: str, upload_id: str):
                hold_total, reported_lien_total, holds_match_lien, checks, created_at
         FROM cases
         WHERE upload_id = %s AND supabase_user_id = %s
+        ORDER BY revision DESC
         LIMIT 1
         """,
         (upload_id, user_id),

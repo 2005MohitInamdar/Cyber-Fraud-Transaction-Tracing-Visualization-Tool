@@ -47,10 +47,10 @@
           class="graph-edge"
           [class.dimmed]="dimEdge(edge)"
           [attr.d]="path(edge)"
-          [attr.stroke]="edge.merged ? '#f472b6' : '#94a3b8'"
+          [attr.stroke]="edge.matchRule === 'bank_response_explicit' ? '#34d399' : (edge.merged ? '#f472b6' : '#94a3b8')"
           [attr.stroke-width]="edgeWidth(edge)"
           [attr.stroke-opacity]="(edge.confidence ?? 1) < 0.75 ? 0.35 : 0.82"
-          [attr.stroke-dasharray]="edge.ambiguous ? '7 5' : null"
+          [attr.stroke-dasharray]="edge.matchRule === 'bank_response_explicit' ? null : (edge.ambiguous ? '7 5' : null)"
           fill="none"
         />
 
@@ -69,12 +69,14 @@
           (keydown)="nodeKey($event, node)"
         >
           <circle *ngIf="node.frozenAmount > 0" class="frozen-ring" [attr.r]="node.radius + 4"></circle>
+          <circle *ngIf="(caseGraph.revision ?? 1) > 1 && node.addedInRevision === caseGraph.revision" class="new-ring" [attr.r]="node.radius + 8"></circle>
           <circle class="node-core" [class.estimated]="node.amountEstimated" [attr.r]="node.radius" [attr.fill]="color(node)"></circle>
           <text class="node-amount" text-anchor="middle" dominant-baseline="central" [attr.fill]="textColor(node)" [attr.font-size]="radiusText(node)">{{ compact(node.disputedAmount) }}</text>
           <text class="node-label" text-anchor="middle" [attr.y]="node.radius + 17">{{ label(node) }}</text>
           <g *ngIf="node.completeness?.status === 'incomplete'" class="incomplete-badge" [attr.transform]="'translate(' + (node.radius * .72) + ' ' + (-node.radius * .72) + ')'">
             <circle r="8" [attr.fill]="badgeColor(node)"></circle><text text-anchor="middle" dominant-baseline="central">!</text>
           </g>
+          <text *ngIf="(caseGraph.revision ?? 1) > 1 && node.addedInRevision === caseGraph.revision" class="new-tag" text-anchor="middle" [attr.y]="-node.radius - 12">NEW</text>
         </g>
       </g>
     </svg>
@@ -92,6 +94,7 @@
     <span><i class="legend-dot isolated"></i>Isolated</span>
     <span><i class="legend-ring"></i>Frozen funds</span>
     <span><i class="legend-dash"></i>Estimated / ambiguous</span>
+    <span *ngIf="(caseGraph.revision ?? 1) > 1"><i class="legend-new"></i>New in this revision</span>
     <span><i class="legend-alert">!</i>Incomplete information; see the list below the graph.</span>
     <span class="legend-note">Number inside circle = disputed amount; circle size grows with it. Drag nodes to move them. Ctrl/⌘ + scroll to zoom. Drag the background to pan.</span>
   </div>
